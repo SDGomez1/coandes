@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -34,14 +35,19 @@ export default function Home() {
         <p className="font-medium text-gray-ligth mb-16">
           Ingreso a la plataforma de administración
         </p>
-        <Label className="text-sm text-gray font-normal mb-2">
+        <Label className="text-sm text-gray-ligth font-normal mb-2">
           Usuario o correo electrónico
         </Label>
         <Input
           placeholder="Usuario o correo electrónico"
           className="h-16 mb-11"
         />
-        <Button className="h-16 mb-9">Continuar</Button>
+        <Link
+          href={"/auth/verifyOtp"}
+          className="h-16 mb-9 w-full text-white rounded bg-primary font-medium flex justify-center items-center"
+        >
+          Continuar
+        </Link>
         <p className="text-gray-ligth w-full text-center mb-5">Ingresar con</p>
         <div className="flex justify-center gap-5">
           <Button
