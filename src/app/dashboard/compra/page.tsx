@@ -1,4 +1,5 @@
 import BreadCrumb from "@/components/dashboard/BreadCrumb";
+import CreateNewPurchase from "@/components/dashboard/compras/CreateNewPurchase";
 import SideNav from "@/components/dashboard/sidenav/SideNav";
 import { Separator } from "@/components/ui/separator";
 
@@ -11,7 +12,9 @@ export default function page() {
           <BreadCrumb />
         </div>
         <Separator />
-        <div className="py-12 px-9"></div>
+        <div className="py-12 px-9">
+          <CreateNewPurchase />
+        </div>
       </section>
     </section>
   );
