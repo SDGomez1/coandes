@@ -26,25 +26,15 @@ import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 
 // ------------------- Schema -------------------
-const qualityItemSchema = z.object({
-  label: z.string().min(1, "El nombre del item es requerido"),
-  selected: z.boolean(),
-});
-
-const qualityParameterSchema = z.object({
-  name: z.string().min(1, "El nombre del parámetro es requerido"),
-  items: z.array(qualityItemSchema),
-});
 
 const productSchema = z.object({
   productName: z.string().min(1, "El nombre es requerido"),
   sku: z.string().min(1, "El código es requerido"),
   unitBase: z.string().min(1),
   presentation: z.string(),
-  equivalence: z.string().optional(),
-  averageWeight: z.string().optional(),
+  equivalence: z.string(),
+  averageWeight: z.string(),
   qualityFactorsId: z.array(z.string()),
-  qualityParameters: z.array(qualityParameterSchema),
 });
 
 export type ProductFormType = z.infer<typeof productSchema>;
@@ -68,17 +58,16 @@ export default function CreateNewProduct({}) {
       averageWeight: "50",
       unitBase: "",
       qualityFactorsId: [],
-      qualityParameters: [],
     },
     mode: "onChange",
   });
 
-  const { trigger, handleSubmit, reset, formState } = methods;
+  const { trigger, handleSubmit, reset } = methods;
 
   const stepFields: Record<number, (keyof ProductFormType)[]> = {
     1: ["productName", "sku"],
     2: ["unitBase", "presentation", "equivalence", "averageWeight"],
-    3: ["qualityFactorsId", "qualityParameters"],
+    3: ["qualityFactorsId"],
   };
 
   const nextStep = async () => {
@@ -101,13 +90,6 @@ export default function CreateNewProduct({}) {
       qualityFactorsId: data.qualityFactorsId.map(
         (s) => s as unknown as Id<"qualityFactors">,
       ),
-      qualityParameters: data.qualityParameters.map((p) => ({
-        name: p.name,
-        items: p.items.map((i) => ({
-          label: i.label,
-          selected: !!i.selected,
-        })),
-      })),
     };
 
     try {

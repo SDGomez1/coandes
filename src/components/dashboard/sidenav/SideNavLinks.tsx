@@ -10,6 +10,7 @@ import {
   FileBox,
   Factory,
   BaggageClaim,
+  BadgeCheck,
 } from "lucide-react";
 export const mainLinks = [
   {
@@ -40,6 +41,12 @@ export const mainLinks = [
 ];
 
 export const creationLinks = [
+  {
+    title: "Gestión de Parámetros",
+    route: "/dashboard/gestion-parametros",
+    icon: BadgeCheck,
+  },
+
   {
     title: "Creación de Productos",
     route: "/dashboard/creacion-productos",

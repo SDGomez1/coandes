@@ -81,19 +81,6 @@ export const createProductTypeWithParameters = mutation({
 
     // existing selected factors
     qualityFactorsId: v.array(v.id("qualityFactors")),
-
-    // custom parameters to be created
-    qualityParameters: v.array(
-      v.object({
-        name: v.string(), // category name
-        items: v.array(
-          v.object({
-            label: v.string(), // factor name
-            selected: v.boolean(),
-          }),
-        ),
-      }),
-    ),
   },
   handler: async (ctx, args) => {
     const org = await ctx.db.query("organizations").first();
@@ -112,51 +99,6 @@ export const createProductTypeWithParameters = mutation({
     const allFactorIds = new Set<string>(
       args.qualityFactorsId.map((id) => id as unknown as string),
     );
-
-    for (const param of args.qualityParameters) {
-      const selectedItems = param.items.filter((i) => i.selected);
-      if (selectedItems.length === 0) continue;
-
-      let category =
-        (await ctx.db
-          .query("qualityFactorsCategory")
-          .withIndex("by_org", (q) => q.eq("organizationId", org._id))
-          .filter((q) => q.eq(q.field("name"), param.name))
-          .first()) ?? null;
-
-      if (!category) {
-        const catId = await ctx.db.insert("qualityFactorsCategory", {
-          organizationId: org._id,
-          name: param.name,
-        });
-        category = {
-          _id: catId,
-          organizationId: org._id,
-          name: param.name,
-          _creationTime: Number(new Date()),
-        };
-      }
-
-      for (const item of selectedItems) {
-        const existingFactor =
-          (await ctx.db
-            .query("qualityFactors")
-            .withIndex("by_qfCat", (q) => q.eq("qfCategoryId", category._id))
-            .filter((q) => q.eq(q.field("name"), item.label))
-            .first()) ?? null;
-
-        if (existingFactor) {
-          allFactorIds.add(existingFactor._id as unknown as string);
-        } else {
-          const factorId = await ctx.db.insert("qualityFactors", {
-            qfCategoryId: category._id,
-            name: item.label,
-            unit: undefined,
-          });
-          allFactorIds.add(factorId as unknown as string);
-        }
-      }
-    }
 
     const factorIdsArray = Array.from(allFactorIds).map(
       (s) => s as unknown as Id<"qualityFactors">,

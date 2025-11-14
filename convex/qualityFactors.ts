@@ -1,36 +1,68 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
-export const createQualityFactorsCategory = mutation({
+export const createQualityCategoriesWithFactors = mutation({
   args: {
-    name: v.string(),
+    categories: v.array(
+      v.object({
+        name: v.string(),
+        factors: v.array(
+          v.object({
+            name: v.string(),
+            unit: v.optional(v.string()),
+          }),
+        ),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
+    const { categories } = args;
+        console.log("test")
     const org = await ctx.db.query("organizations").first();
     if (!org) throw new Error("Organization not found");
     if (org.active === false) throw new Error("Organization is not active");
 
-    const existing = await ctx.db
-      .query("qualityFactorsCategory")
-      .withIndex("by_org", (q) => q.eq("organizationId", org._id))
-      .filter((q) => q.eq(q.field("name"), args.name))
-      .first();
-
-    if (existing) {
-      throw new Error(
-        `Quality factors category "${args.name}" already exists in this organization`,
-      );
+    if (!categories.length) {
+      throw new Error("Debe crear al menos una categoría.");
     }
 
-    const id = await ctx.db.insert("qualityFactorsCategory", {
-      organizationId: org._id,
-      name: args.name,
-    });
+    const results: {
+      categoryId: string;
+      factorIds: string[];
+      name: string;
+    }[] = [];
 
-    return id;
+    for (const cat of categories) {
+      if (!cat.factors.length) {
+        throw new Error(
+          `La categoría "${cat.name}" debe tener al menos un factor.`,
+        );
+      }
+
+      const categoryId = await ctx.db.insert("qualityFactorsCategory", {
+        organizationId: org._id,
+        name: cat.name,
+      });
+
+      const factorIds: string[] = [];
+      for (const factor of cat.factors) {
+        const qfId = await ctx.db.insert("qualityFactors", {
+          qfCategoryId: categoryId,
+          name: factor.name,
+          unit: factor.unit,
+        });
+        factorIds.push(qfId);
+      }
+
+      results.push({ categoryId, factorIds, name: cat.name });
+    }
+
+    return {
+      created: results,
+      count: results.length,
+    };
   },
 });
-
 export const createQualityFactor = mutation({
   args: {
     qfCategoryId: v.id("qualityFactorsCategory"),
