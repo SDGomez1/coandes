@@ -9,7 +9,7 @@ import Link from "next/link";
 
 export default function SideNav() {
   return (
-    <div className="flex flex-col w-80 h-full shrink-0 bg-[#FAFAFA] px-8 py-6 gap-4">
+    <div className="flex flex-col w-80 h-full shrink-0 bg-[#FAFAFA] px-8 py-6 gap-4 overflow-y-auto">
       <div className="flex flex-col gap-2">
         <Image src={Logo} alt="logo" className="w-full " />
       </div>

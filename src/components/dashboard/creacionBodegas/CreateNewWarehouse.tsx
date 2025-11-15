@@ -28,20 +28,44 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { toast } from "sonner";
+
+const formSchema = z.object({
+  name: z.string().min(1, "El nombre es obligatorio").trim(),
+  capacity: z
+    .number()
+    .finite("Capacidad inválida")
+    .nonnegative("Debe ser 0 o mayor"),
+  unit: z.string().min(1, "La unidad es obligatoria"),
+  rows: z
+    .number()
+    .int("Debe ser un número entero")
+    .positive("Debe ser mayor que 0"),
+});
+
+type FormValues = z.infer<typeof formSchema>;
 
 export default function CreateNewWarehouse() {
   const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
+  const createWarehouse = useMutation(api.warehouse.createWarehouse);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      capacity: "",
+      capacity: 0,
       unit: "",
-      rows: 0,
+      rows: 1,
     },
+    mode: "onSubmit",
   });
+
+  const currentUnit = form.watch("unit");
+  const currentCapacity = form.watch("capacity");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -74,16 +98,35 @@ export default function CreateNewWarehouse() {
           <Form {...form}>
             <form
               onSubmit={form.handleSubmit(
-                (data) => {},
+                async (data) => {
+                  try {
+                    setIsLoading(true);
+                    await createWarehouse({
+                      name: data.name,
+                      rows: data.rows,
+                      capacity: data.capacity,
+                      baseUnit: data.unit,
+                    });
+                    toast.success("Bodega creada correctamente");
+                    form.reset();
+                    setOpen(false);
+                  } catch (e) {
+                    toast.error(
+                      "Tenemos problemas para crear una nueva bodega, inténtalo más tarde",
+                    );
+                  } finally {
+                    setIsLoading(false);
+                  }
+                },
                 (e) => console.log(e),
               )}
-              className="px-9 flex flex-col h-full  overflow-y-auto"
+              className="px-9 flex flex-col h-full overflow-y-auto"
             >
               <DialogTitle className="mt-7 font-semibold text-lg">
-                Información de bodega
+                Información básica
               </DialogTitle>
               <p className="text-gray-ligth mt-4 mb-6">
-                Defina las caracteristicas de la bodega
+                Defina las características de la bodega
               </p>
 
               <div className="grid grid-cols-2 gap-4">
@@ -106,35 +149,17 @@ export default function CreateNewWarehouse() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="capacity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-normal">
-                        Capacidad
-                        <span className="text-destructive">*</span>
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder="2000"
-                          className="text-xs placeholder:text-xs"
-                          type="number"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+
                 <FormField
                   control={form.control}
                   name="unit"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Unidad </FormLabel>
+                      <FormLabel className="text-sm font-normal">
+                        Unidad base <span className="text-destructive">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Select
-                          {...field}
                           value={field.value}
                           onValueChange={field.onChange}
                         >
@@ -156,24 +181,61 @@ export default function CreateNewWarehouse() {
 
                 <FormField
                   control={form.control}
-                  name="rows"
+                  name="capacity"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-sm font-normal">
-                        Filas disponibles
+                        Capacidad máxima{" "}
                         <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
                         <Input
-                          {...field}
-                          placeholder="CR-IND"
                           type="number"
-                          className="text-xs placeholder:text-xs "
+                          inputMode="decimal"
+                          placeholder="2000"
+                          className="text-xs placeholder:text-xs"
+                          {...form.register("capacity", {
+                            valueAsNumber: true,
+                          })}
                         />
                       </FormControl>
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="rows"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-normal">
+                        Número de filas{" "}
+                        <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          placeholder="10"
+                          className="text-xs placeholder:text-xs"
+                          {...form.register("rows", {
+                            valueAsNumber: true,
+                          })}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="flex w-full justify-center items-center my-4">
+                <p className="text-sm text-gray-ligth">
+                  Capacidad máxima:{" "}
+                  {typeof currentCapacity === "number" && currentCapacity > 0
+                    ? currentCapacity
+                    : 100}{" "}
+                  {currentUnit?.trim() ? currentUnit : "kg"}
+                </p>
               </div>
 
               <div className="flex justify-between mt-auto gap-4 pt-4 pb-11">
@@ -182,6 +244,7 @@ export default function CreateNewWarehouse() {
                   className="w-1/2 shrink"
                   variant="outline"
                   onClick={() => setCancelConfirm(true)}
+                  disabled={isLoading}
                 >
                   Cancelar
                 </Button>
@@ -189,8 +252,9 @@ export default function CreateNewWarehouse() {
                 <Button
                   type="submit"
                   className="bg-primary px-4 py-2 rounded text-white w-1/2 shrink"
+                  disabled={isLoading}
                 >
-                  Terminar
+                  {isLoading ? "Guardando..." : "Terminar"}
                 </Button>
               </div>
             </form>
@@ -200,9 +264,3 @@ export default function CreateNewWarehouse() {
     </Dialog>
   );
 }
-const formSchema = z.object({
-  name: z.string(),
-  capacity: z.string(),
-  unit: z.string(),
-  rows: z.number(),
-});

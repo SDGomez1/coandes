@@ -14,6 +14,7 @@ import type * as http from "../http.js";
 import type * as productTypes from "../productTypes.js";
 import type * as qualityFactors from "../qualityFactors.js";
 import type * as user from "../user.js";
+import type * as warehouse from "../warehouse.js";
 
 import type {
   ApiFromModules,
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   productTypes: typeof productTypes;
   qualityFactors: typeof qualityFactors;
   user: typeof user;
+  warehouse: typeof warehouse;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

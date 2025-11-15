@@ -35,4 +35,11 @@ export default defineSchema({
     averageWeigth: v.string(),
     qualityFactorsId: v.array(v.id("qualityFactors")),
   }).index("by_org", ["organizationId"]),
+  warehouse: defineTable({
+    organizationId: v.id("organizations"),
+    name: v.string(),
+    capacity: v.number(),
+    baseUnit: v.string(),
+    row: v.number(),
+  }).index("by_org", ["organizationId"]),
 });
