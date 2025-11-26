@@ -24,7 +24,7 @@ export const mainLinks = [
     icon: ShoppingCart,
   },
   {
-    title: "Bodega",
+    title: "Almacenamiento",
     route: "/dashboard/bodega",
     icon: Warehouse,
   },
