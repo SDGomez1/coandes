@@ -23,8 +23,7 @@ export default function Page() {
   const organization = useQuery(api.organizations.getOrg);
   const orgId = organization?._id as Id<"organizations">;
 
-  const warehouses = useQuery(api.warehouse.getAvailableWarehose, {
-  });
+  const warehouses = useQuery(api.warehouse.getAvailableWarehose, {});
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<
     Id<"warehouse"> | undefined
   >(undefined);
@@ -43,7 +42,7 @@ export default function Page() {
   );
 
   const currentAmount =
-    Number(warehouseInventoryData?.totalQuantity as number / 1000) ?? 0;
+    Number(warehouseInventoryData?.totalQuantity as number) ?? 0;
   const maxCapacity = selectedWarehouse?.capacity ?? 0;
   const unit = selectedWarehouse?.baseUnit ?? "";
   const percentageUsage =
