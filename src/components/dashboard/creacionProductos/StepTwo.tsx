@@ -20,6 +20,7 @@ export default function StepTwo() {
 
   const currentUnit = watch("unitBase");
   const equivalence = watch("equivalence");
+  const currentPresentation = watch("presentation");
   const averageWeight = watch("averageWeight");
   return (
     <>
@@ -93,7 +94,7 @@ export default function StepTwo() {
         />
       </div>
       <p className="font-light text-sm text-gray-ligth my-7 mx-auto">
-                {equivalence ? equivalence : 1} Bulto = {averageWeight ? averageWeight : 50} {currentUnit.length > 0 ?  currentUnit : "Kg"}
+                {equivalence ? equivalence : 1} {currentPresentation ? currentPresentation : "Bulto"} = {averageWeight ? averageWeight : 50} {currentUnit.length > 0 ?  currentUnit : "Kg"}
       </p>
     </>
   );

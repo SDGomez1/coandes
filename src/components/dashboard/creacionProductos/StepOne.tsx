@@ -2,6 +2,13 @@ import { useEffect } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   FormField,
   FormItem,
   FormControl,
@@ -69,7 +76,7 @@ export default function StepOne() {
         Información básica
       </DialogTitle>
       <p className="text-gray-ligth mt-4 mb-6">
-        Defina la identidad del producto en el catálogo.
+        Defina la identidad y el tipo del producto en el catálogo.
       </p>
       <div className="grid grid-cols-2 gap-4">
         <FormField
@@ -106,6 +113,31 @@ export default function StepOne() {
                   readOnly
                 />
               </FormControl>
+            </FormItem>
+          )}
+        />
+      </div>
+      <div className="grid grid-cols-1 mt-4">
+        <FormField
+          control={control}
+          name="type"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-sm font-normal">
+                Tipo de producto <span className="text-destructive">*</span>
+              </FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione un tipo" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Raw Material">Materia Prima</SelectItem>
+                  <SelectItem value="Finished Good">Producto Terminado</SelectItem>
+                  <SelectItem value="By-product">Subproducto</SelectItem>
+                </SelectContent>
+              </Select>
             </FormItem>
           )}
         />

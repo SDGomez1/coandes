@@ -28,9 +28,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { toast } from "sonner";
+import { Id } from "../../../../convex/_generated/dataModel";
 
 const formSchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio").trim(),
@@ -48,6 +49,7 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export default function CreateNewWarehouse() {
+  const orgId = useQuery(api.organizations.getOrg);
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [cancelConfirm, setCancelConfirm] = useState(false);
@@ -102,6 +104,7 @@ export default function CreateNewWarehouse() {
                   try {
                     setIsLoading(true);
                     await createWarehouse({
+                      organizationId: orgId?._id as Id<"organizations">,
                       name: data.name,
                       rows: data.rows,
                       capacity: data.capacity,

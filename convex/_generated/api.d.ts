@@ -9,10 +9,17 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as customers from "../customers.js";
+import type * as dispatches from "../dispatches.js";
 import type * as email from "../email.js";
 import type * as http from "../http.js";
-import type * as productTypes from "../productTypes.js";
+import type * as inventory from "../inventory.js";
+import type * as organizations from "../organizations.js";
+import type * as production from "../production.js";
+import type * as products from "../products.js";
+import type * as purchases from "../purchases.js";
 import type * as qualityFactors from "../qualityFactors.js";
+import type * as suppliers from "../suppliers.js";
 import type * as user from "../user.js";
 import type * as warehouse from "../warehouse.js";
 
@@ -32,10 +39,17 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  customers: typeof customers;
+  dispatches: typeof dispatches;
   email: typeof email;
   http: typeof http;
-  productTypes: typeof productTypes;
+  inventory: typeof inventory;
+  organizations: typeof organizations;
+  production: typeof production;
+  products: typeof products;
+  purchases: typeof purchases;
   qualityFactors: typeof qualityFactors;
+  suppliers: typeof suppliers;
   user: typeof user;
   warehouse: typeof warehouse;
 }>;

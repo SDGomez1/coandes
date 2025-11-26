@@ -29,7 +29,7 @@ export const mainLinks = [
     icon: Warehouse,
   },
   {
-    title: "Productos",
+    title: "Producción",
     route: "/dashboard/productos",
     icon: Package,
   },
@@ -48,17 +48,17 @@ export const creationLinks = [
   },
 
   {
-    title: "Creación de Productos",
+    title: "Gestión de Productos",
     route: "/dashboard/creacion-productos",
     icon: FileBox,
   },
   {
-    title: "Creación de Bodegas",
+    title: "Gestión de Bodegas",
     route: "/dashboard/creacion-bodegas",
     icon: Factory,
   },
   {
-    title: "Creación de Proveedores",
+    title: "Gestión de Proveedores",
     route: "/dashboard/creacion-proveedores",
     icon: BaggageClaim,
   },

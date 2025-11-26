@@ -1,22 +1,18 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { handler } from "next/dist/build/templates/app-page";
 
 export const createWarehouse = mutation({
   args: {
+    organizationId: v.id("organizations"), // NEW ARG
     name: v.string(),
     capacity: v.number(),
     rows: v.number(),
     baseUnit: v.string(),
   },
   handler: async (ctx, args) => {
-    const org = await ctx.db.query("organizations").first();
-
-    if (!org) throw new Error("Organization not found");
-    if (org.active === false) throw new Error("Organization is not active");
-
+    // No need to query for org, organizationId is passed directly
     const warehouse = await ctx.db.insert("warehouse", {
-      organizationId: org._id,
+      organizationId: args.organizationId, // Use direct arg
       name: args.name,
       capacity: args.capacity,
       row: args.rows,
@@ -31,13 +27,13 @@ export const getAvailableWarehose = query({
   args: {},
   handler: async (ctx, args) => {
     const org = await ctx.db.query("organizations").first();
-
-    if (!org) throw new Error("Organization not found");
-    if (org.active === false) throw new Error("Organization is not active");
-
+        if (!org){
+            return
+        }
     const data = await ctx.db
       .query("warehouse")
-      .withIndex("by_org", (q) => q.eq("organizationId", org._id)).collect();
+      .withIndex("by_org", (q) => q.eq("organizationId", org?._id)) // Use direct arg
+      .collect();
 
     return data;
   },

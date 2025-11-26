@@ -8,9 +8,13 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { api } from "../../../../convex/_generated/api";
+import { Id } from "../../../../convex/_generated/dataModel";
 
 export default function ProductTable() {
-  const products = useQuery(api.productTypes.listProductTypes, {});
+  const org = useQuery(api.organizations.getOrg);
+  const products = useQuery(api.products.getProducts, {
+    organizationId: org?._id as Id<"organizations">,
+  });
 
   const categoriesWithFactors = useQuery(
     api.qualityFactors.listCategoriesWithFactorsByOrganization,
