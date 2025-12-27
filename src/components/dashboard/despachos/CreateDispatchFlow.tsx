@@ -28,6 +28,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
+import { UnitAwareInput } from "@/components/ui/UnitAwareInput";
+import { WeightUnit, convertFromCanonical } from "@/lib/units";
 
 // ------------------- Main Component -------------------
 export default function CreateDispatchFlow() {
@@ -135,7 +137,11 @@ function DispatchForm() {
                         <FormLabel>Lote Disponible <span className="text-destructive">*</span></FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl><SelectTrigger><SelectValue placeholder={!availableLots ? "Cargando lotes..." : "Seleccione un lote..."} /></SelectTrigger></FormControl>
-                            <SelectContent>{availableLots?.map(lot => <SelectItem key={lot._id} value={lot._id}>{`${lot.lotNumber} (Disponible: ${lot.quantity} ${lot.unit})`}</SelectItem>)}</SelectContent>
+                            <SelectContent>{availableLots?.map(lot => (
+                              <SelectItem key={lot._id} value={lot._id}>
+                                {`${lot.lotNumber} (Disponible: ${parseFloat(convertFromCanonical(lot.quantity, lot.unit as WeightUnit).toPrecision(10))} ${lot.unit})`}
+                              </SelectItem>
+                            ))}</SelectContent>
                         </Select>
                     </FormItem>
                 )}/>
@@ -144,10 +150,19 @@ function DispatchForm() {
           {selectedLot && (
             <div className="space-y-6 pt-4 border-t">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField name="quantityDispatched" render={({ field }) => (
+                <FormField
+                  control={form.control}
+                  name="quantityDispatched"
+                  render={({ field }) => (
                     <FormItem>
                         <FormLabel>Cantidad a Despachar <span className="text-destructive">*</span></FormLabel>
-                        <FormControl><Input type="number" placeholder="0" {...form.register("quantityDispatched", { valueAsNumber: true, max: selectedLot.quantity })} /></FormControl>
+                        <FormControl>
+                          <UnitAwareInput
+                            valueInCanonicalUnit={field.value}
+                            onChange={field.onChange}
+                            preferredDisplayUnit={selectedLot?.unit as WeightUnit}
+                          />
+                        </FormControl>
                         <FormMessage />
                     </FormItem>
                 )}/>

@@ -28,6 +28,7 @@ export const createAuth = (
     plugins: [
       convex(),
       emailOTP({
+        disableSignUp: true,
         async sendVerificationOTP({ email, otp, type }) {
           if (type === "sign-in") {
             const subject = "Your sign-in code";

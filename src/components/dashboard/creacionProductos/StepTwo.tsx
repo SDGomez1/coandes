@@ -1,10 +1,10 @@
-import { useFormContext, useWatch } from "react-hook-form";
-import { Input } from "@/components/ui/input";
+import { useFormContext } from "react-hook-form";
 import {
   FormField,
   FormItem,
   FormControl,
   FormLabel,
+  FormMessage,
 } from "@/components/ui/form";
 import { DialogTitle } from "@/components/ui/dialog";
 import {
@@ -14,14 +14,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { WEIGHT_UNIT_OPTIONS, WeightUnit } from "@/lib/units";
 
 export default function StepTwo() {
   const { control, watch } = useFormContext();
 
-  const currentUnit = watch("unitBase");
+  const currentUnit = watch("unitBase") as WeightUnit;
   const equivalence = watch("equivalence");
   const currentPresentation = watch("presentation");
   const averageWeight = watch("averageWeight");
+
   return (
     <>
       <DialogTitle className="mt-7 font-semibold text-lg">Unidades</DialogTitle>
@@ -42,14 +45,14 @@ export default function StepTwo() {
                   onValueChange={field.onChange}
                 >
                   <SelectTrigger className="w-full shrink">
-                    <SelectValue placeholder="Kilogramo / Kg" />
+                    <SelectValue placeholder="Seleccionar unidad" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="kg">Kilogramo / Kg</SelectItem>
-                    <SelectItem value="g">Gramo / g</SelectItem>
-                    <SelectItem value="t">Tonelada / t</SelectItem>
-                    <SelectItem value="lb">Libra / lb</SelectItem>
-                    <SelectItem value="oz">Onza / oz</SelectItem>
+                    {WEIGHT_UNIT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </FormControl>
@@ -87,14 +90,27 @@ export default function StepTwo() {
             <FormItem>
               <FormLabel>Peso promedio</FormLabel>
               <FormControl>
-                <Input {...field} placeholder="50" type="number" />
+                <Input
+                  {...field}
+                  type="number"
+                  onChange={(e) =>
+                    field.onChange(
+                      e.target.value === ""
+                        ? 0
+                        : Number(e.target.value),
+                    )
+                  }
+                />
               </FormControl>
+              <FormMessage />
             </FormItem>
           )}
         />
       </div>
       <p className="font-light text-sm text-gray-ligth my-7 mx-auto">
-                {equivalence ? equivalence : 1} {currentPresentation ? currentPresentation : "Bulto"} = {averageWeight ? averageWeight : 50} {currentUnit.length > 0 ?  currentUnit : "Kg"}
+        {equivalence ? equivalence : 1}{" "}
+        {currentPresentation ? currentPresentation : "Bulto"} = {averageWeight}{" "}
+        {currentUnit.length > 0 ? currentUnit : "Kg"}
       </p>
     </>
   );

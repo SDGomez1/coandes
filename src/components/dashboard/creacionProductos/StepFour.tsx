@@ -29,7 +29,7 @@ export default function StepFour() {
       </DialogTitle>
       <p className="text-gray-ligth mt-4 mb-6">
         Seleccione los productos que pueden resultar de la producción de este
-        item.
+        item. Solo puede seleccionar Subproductos o Productos Terminados.
       </p>
       <FormField
         control={control}
@@ -42,9 +42,14 @@ export default function StepFour() {
                 Seleccione uno o más productos.
               </FormDescription>
             </div>
-            <div className="flex flex-col space-y-2 max-h-60 overflow-y-auto">
+            <div className="flex flex-col space-y-2 max-h-60 overflow-y-auto border rounded p-2">
               {products === undefined && <LoadingSpinner />}
-              {products?.map((product) => (
+              {products && products.filter(p => p.type === "Finished Good" || p.type === "By-product").length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  No hay Subproductos o Productos Terminados disponibles para seleccionar como salida.
+                </p>
+              )}
+              {products?.filter(p => p.type === "Finished Good" || p.type === "By-product").map((product) => (
                 <FormField
                   key={product._id}
                   control={control}
@@ -60,7 +65,7 @@ export default function StepFour() {
                             checked={field.value?.includes(product._id)}
                             onCheckedChange={(checked) => {
                               return checked
-                                ? field.onChange([...field.value, product._id])
+                                ? field.onChange([...(field.value ?? []), product._id])
                                 : field.onChange(
                                     field.value?.filter(
                                       (value: string) => value !== product._id

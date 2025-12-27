@@ -8,6 +8,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { ChevronRight } from "lucide-react";
+import EditWarehouse from "./EditWarehouse";
+import { convertFromCanonical } from "@/lib/units";
 
 export default function WarehouseTable() {
   const wareHouseData = useQuery(api.warehouse.getAvailableWarehose);
@@ -25,16 +27,19 @@ export default function WarehouseTable() {
         {wareHouseData.map((factor) => {
           return (
             <AccordionItem key={factor._id} value={factor._id as string}>
-              <AccordionTrigger
-                className="text-xs font-medium flex justify-baseline gap-2 items-center"
-                showChevronIcon={false}
-              >
-                <ChevronRight className="size-4 text-primary" />
-                {factor.name}
-              </AccordionTrigger>
+              <div className="flex justify-between items-center">
+                <AccordionTrigger
+                  className="text-xs font-medium flex justify-baseline gap-2 items-center"
+                  showChevronIcon={false}
+                >
+                  <ChevronRight className="size-4 text-primary" />
+                  {factor.name}
+                </AccordionTrigger>
+                <EditWarehouse warehouse={factor} />
+              </div>
               <AccordionContent className="px-4 pb-4">
                 <ul className="list-disc pl-6 space-y-1 text-gray text-xs">
-                  <li>Capacidad: {`${factor.capacity} ${factor.baseUnit}`} </li>
+                  <li>Capacidad: {`${convertFromCanonical(factor.capacity, factor.baseUnit)} ${factor.baseUnit}`} </li>
                   <li>Filas: {factor.row} </li>
                 </ul>
               </AccordionContent>

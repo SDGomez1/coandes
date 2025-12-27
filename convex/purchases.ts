@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 
 /**
  * Creates a new purchase order.
@@ -35,8 +36,7 @@ export const createPurchase = mutation({
  * @param productId - The ID of the product being received.
  * @param warehouseId - The ID of the warehouse to store the goods.
  * @param lotNumber - A unique identifier for this batch/lot.
- * @param quantity - The quantity of the product received.
- * @param unit - The unit of measurement for the quantity.
+ * @param quantity - The quantity of the product received, in canonical units (grams).
  * @param qualityFactorValues - Optional: A record of quality factor IDs to their measured values for this lot.
  * @returns The ID of the newly created inventory lot.
  */
@@ -48,8 +48,7 @@ export const receivePurchase = mutation({
     vehicleInfo: v.string(),
     lotNumber: v.string(),
     quantity: v.number(),
-    unit: v.string(),
-    qualityFactorValues: v.optional(v.record(v.string(), v.string())), // NEW ARG
+    qualityFactorValues: v.optional(v.record(v.string(), v.string())),
   },
   handler: async (ctx, args) => {
     const purchase = await ctx.db.get(args.purchaseId);
@@ -77,9 +76,8 @@ export const receivePurchase = mutation({
       warehouseId: args.warehouseId,
       lotNumber: args.lotNumber,
       quantity: args.quantity,
-      unit: args.unit,
       creationDate: Date.now(),
-      qualityFactorValues: args.qualityFactorValues, // SAVE NEW ARG
+      qualityFactorValues: args.qualityFactorValues,
       vehicleInfo: args.vehicleInfo,
       source: {
         type: "purchase",
@@ -143,7 +141,7 @@ export const getPurchaseHistory = query({
           creationDate: lot.creationDate,
           warehouseName: warehouse?.name ?? "Bodega no encontrada",
           quantity: lot.quantity,
-          unit: lot.unit,
+          unit: product?.baseUnit ?? "N/A",
           vehicleInfo: lot.vehicleInfo,
         };
       }),
@@ -152,3 +150,4 @@ export const getPurchaseHistory = query({
     return history;
   },
 });
+

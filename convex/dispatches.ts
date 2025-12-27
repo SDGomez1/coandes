@@ -128,7 +128,7 @@ export const getDispatchHistory = query({
                     lotNumber: lot?.lotNumber ?? "N/A",
                     productName: product?.name ?? "Producto no encontrado",
                     quantityDispatched: item.quantityDispatched,
-                    unit: lot?.unit ?? "N/A"
+                    unit: product?.baseUnit ?? "N/A"
                 });
             }
         }

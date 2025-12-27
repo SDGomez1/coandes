@@ -9,8 +9,8 @@ import LoginForm from "@/components/auth/LoginForm";
 
 export default function Home() {
   return (
-    <section className="flex w-full overflow-y-hidden">
-      <div className="w-1/2 relative hidden lg:block h-screen">
+    <section className="flex w-full overflow-y-hidden max-h-screen">
+      <div className="w-1/2 relative hidden lg:block h-screen overflow-y-hidden">
         <div className="w-full h-full bg-black opacity-60 absolute"></div>
         <Image src={BGImage} alt="logo" className="w-full " />
       </div>
@@ -34,8 +34,8 @@ export default function Home() {
           Ingreso a la plataforma de administración
         </p>
         <LoginForm />
-        <p className="text-gray-ligth w-full text-center mb-5">Ingresar con</p>
-        <div className="flex justify-center lg:gap-5 flex-col lg:flex-row items-center gap-2">
+        <p className="text-gray-ligth w-full text-center mb-5 hidden">Ingresar con</p>
+        <div className="justify-center lg:gap-5 flex-col lg:flex-row items-center gap-2 hidden">
           <Button
             variant={"outline"}
             className="h-16 mb-9 w-60 text-black-ligth flex justify-center items-center gap-2"

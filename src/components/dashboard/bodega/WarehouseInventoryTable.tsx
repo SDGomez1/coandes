@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-table";
 import { useMemo } from "react";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
+import { convertFromCanonical, WeightUnit } from "@/lib/units";
 
 // Define the type for our flattened warehouse inventory data
 type WarehouseInventoryRow = {
@@ -48,10 +49,18 @@ export default function WarehouseInventoryTable({ warehouseId, organizationId }:
       header: () => <span>Tipo de Producto</span>,
       cell: (info) => info.getValue(),
     }),
-    columnHelper.accessor((row) => `${row.quantity} ${row.unit}`, {
+    columnHelper.accessor("quantity", {
       id: "currentWeight",
       header: () => <span>Peso Actual</span>,
-      cell: (info) => info.getValue(),
+      cell: (info) => {
+        const quantity = info.getValue();
+        const { unit } = info.row.original;
+        if (quantity === null || quantity === undefined) return "N/A";
+        const displayValue = parseFloat(
+          convertFromCanonical(quantity, unit as WeightUnit).toPrecision(10)
+        );
+        return `${displayValue} ${unit}`;
+      },
     }),
   ], []);
 

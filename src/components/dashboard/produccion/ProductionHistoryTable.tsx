@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-table";
 import { useMemo } from "react";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
+import { convertFromCanonical, WeightUnit } from "@/lib/units";
 
 // Define the type for our flattened history data
 type ProductionHistoryRow = {
@@ -49,10 +50,18 @@ export default function ProductionHistoryTable() {
       header: () => <span>Entrada</span>,
       cell: (info) => info.getValue(),
     }),
-    columnHelper.accessor(row => `${row.quantityConsumed} ${row.inputUnit}`, {
+    columnHelper.accessor("quantityConsumed", {
         id: "quantityConsumed",
         header: () => <span>Cant. Consumida</span>,
-        cell: (info) => info.getValue(),
+        cell: (info) => {
+            const quantity = info.getValue();
+            const { inputUnit } = info.row.original;
+            if (quantity === null || quantity === undefined) return "N/A";
+            const displayValue = parseFloat(
+                convertFromCanonical(quantity, inputUnit as WeightUnit).toPrecision(10)
+            );
+            return `${displayValue} ${inputUnit}`;
+        },
     }),
     columnHelper.accessor("outputs", {
       header: () => <span>Salidas</span>,
@@ -60,7 +69,14 @@ export default function ProductionHistoryTable() {
         <ul className="list-disc pl-4 space-y-1">
             {info.getValue().map((output, index) => (
                 <li key={index} className="text-xs">
-                    <span className="font-semibold">{output.productName}:</span> {output.quantityProduced} {output.unit}
+                    <span className="font-semibold">{output.productName}:</span>{' '}
+                    {parseFloat(
+                      convertFromCanonical(
+                        output.quantityProduced,
+                        output.unit as WeightUnit
+                      ).toPrecision(10)
+                    )}{' '}
+                    {output.unit}
                     <span className="text-gray-500"> (Lote: {output.newLotNumber})</span>
                 </li>
             ))}

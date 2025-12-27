@@ -7,10 +7,27 @@ import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
+  getPaginationRowModel,
   useReactTable,
+  Table,
 } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
+import { convertFromCanonical, WeightUnit } from "@/lib/units";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronsLeft,
+  ChevronsRight,
+} from "lucide-react";
 
 // Define the type for our flattened purchase history data
 type PurchaseHistoryRow = {
@@ -26,6 +43,112 @@ type PurchaseHistoryRow = {
 };
 
 const columnHelper = createColumnHelper<PurchaseHistoryRow>();
+
+// --- Pagination Controls Component ---
+function PaginationControls<T>({ table }: { table: Table<T> }) {
+  const pageIndex = table.getState().pagination.pageIndex;
+  const pageCount = table.getPageCount();
+
+  const getPageNumbers = () => {
+    const pages = [];
+    if (pageCount <= 5) {
+      for (let i = 0; i < pageCount; i++) pages.push(i);
+    } else {
+      if (pageIndex < 3) {
+        pages.push(0, 1, 2, 3, -1, pageCount - 1);
+      } else if (pageIndex >= pageCount - 3) {
+        pages.push(
+          0,
+          -1,
+          pageCount - 4,
+          pageCount - 3,
+          pageCount - 2,
+          pageCount - 1,
+        );
+      } else {
+        pages.push(0, -1, pageIndex - 1, pageIndex, pageIndex + 1, -1, pageCount - 1);
+      }
+    }
+    return pages;
+  };
+
+  const start = pageIndex * table.getState().pagination.pageSize + 1;
+  const end = Math.min(start + table.getState().pagination.pageSize - 1, table.getFilteredRowModel().rows.length);
+
+  return (
+    <div className="flex items-center justify-between p-4">
+      <span className="text-sm text-gray-700">
+        Mostrando {start} a {end} de {table.getFilteredRowModel().rows.length} resultados
+      </span>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => table.setPageIndex(0)}
+          disabled={!table.getCanPreviousPage()}
+        >
+          <ChevronsLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+        </Button>
+        {getPageNumbers().map((page, i) =>
+          page === -1 ? (
+            <span key={`ellipsis-${i}`} className="px-2">...</span>
+          ) : (
+            <Button
+              key={page}
+              variant={page === pageIndex ? "default" : "outline"}
+              size="icon"
+              onClick={() => table.setPageIndex(page)}
+            >
+              {page + 1}
+            </Button>
+          ),
+        )}
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+        >
+          <ChevronRightIcon className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => table.setPageIndex(pageCount - 1)}
+          disabled={!table.getCanNextPage()}
+        >
+          <ChevronsRight className="h-4 w-4" />
+        </Button>
+        <Select
+          value={String(table.getState().pagination.pageSize)}
+          onValueChange={(value) => {
+            table.setPageSize(Number(value));
+          }}
+        >
+          <SelectTrigger className="w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[2, 20, 30, 40, 50].map((size) => (
+              <SelectItem key={size} value={String(size)}>
+                {size} / página
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
+
 
 export default function PurchaseHistoryTable() {
   const organization = useQuery(api.organizations.getOrg);
@@ -62,10 +185,18 @@ export default function PurchaseHistoryTable() {
         header: () => <span>Placa Vehiculo</span>,
         cell: (info) => info.getValue(),
       }),
-      columnHelper.accessor((row) => `${row.quantity} ${row.unit}`, {
+      columnHelper.accessor("quantity", {
         id: "weight",
         header: () => <span>Peso</span>,
-        cell: (info) => info.getValue(),
+        cell: (info) => {
+          const quantity = info.getValue();
+          const { unit } = info.row.original;
+          if (quantity === null || quantity === undefined) return "N/A";
+          const displayValue = parseFloat(
+            convertFromCanonical(quantity, unit as WeightUnit).toPrecision(10),
+          );
+          return `${displayValue} ${unit}`;
+        },
       }),
     ],
     [],
@@ -75,6 +206,7 @@ export default function PurchaseHistoryTable() {
     data: data ?? [],
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   });
 
   if (data === undefined) {
@@ -139,9 +271,11 @@ export default function PurchaseHistoryTable() {
                 ))}
               </tbody>
             </table>
+            <PaginationControls table={table} />
           </div>
         </div>
       </div>
     </div>
   );
 }
+

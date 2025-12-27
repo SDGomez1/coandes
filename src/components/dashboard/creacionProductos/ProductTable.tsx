@@ -8,12 +8,63 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { api } from "../../../../convex/_generated/api";
-import { Id } from "../../../../convex/_generated/dataModel";
+import { Doc, Id } from "../../../../convex/_generated/dataModel";
+import ProductCard from "./ProductCard";
+import EditProduct from "./EditProduct";
+
+function ProductCategorySection({
+  title,
+  products,
+  factorIdToInfo,
+}: {
+  title: string;
+  products: Doc<"products">[] | undefined;
+  factorIdToInfo: Map<string, { name: string; categoryName: string }>;
+}) {
+  if (!products || products.length === 0) {
+    return (
+      <div className="w-full py-3 flex justify-center items-center border-t border-neutral-200">
+        <p className="text-gray text-xs">
+          No hay productos en la categoría: {title}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <Accordion type="multiple" className="w-full">
+      {products.map((prod) => (
+        <AccordionItem key={prod._id} value={prod._id as string}>
+          <div className="flex items-center">
+            <AccordionTrigger className="text-xs font-medium flex-1">
+              {prod.name} | {prod.sku}
+            </AccordionTrigger>
+            <EditProduct product={prod} />
+          </div>
+          <AccordionContent>
+            <ProductCard product={prod} factorIdToInfo={factorIdToInfo} />
+          </AccordionContent>
+        </AccordionItem>
+      ))}
+    </Accordion>
+  );
+}
 
 export default function ProductTable() {
   const org = useQuery(api.organizations.getOrg);
-  const products = useQuery(api.products.getProducts, {
-    organizationId: org?._id as Id<"organizations">,
+  const orgId = org?._id as Id<"organizations">;
+
+  const rawMaterials = useQuery(api.products.getProductsByType, {
+    organizationId: orgId,
+    type: "Raw Material",
+  });
+  const finishedGoods = useQuery(api.products.getProductsByType, {
+    organizationId: orgId,
+    type: "Finished Good",
+  });
+  const byProducts = useQuery(api.products.getProductsByType, {
+    organizationId: orgId,
+    type: "By-product",
   });
 
   const categoriesWithFactors = useQuery(
@@ -34,7 +85,13 @@ export default function ProductTable() {
     return map;
   }, [categoriesWithFactors]);
 
-  if (!products || products.length === 0) {
+  const allProducts = [
+    ...(rawMaterials ?? []),
+    ...(finishedGoods ?? []),
+    ...(byProducts ?? []),
+  ];
+
+  if (!allProducts || allProducts.length === 0) {
     return (
       <div className="w-full py-6 flex justify-center items-center border border-neutral-200 rounded my-8 shadow">
         <p className="text-gray text-xs">Aún no hay productos en el catálogo</p>
@@ -46,45 +103,42 @@ export default function ProductTable() {
     <div className="w-full py-6  border border-neutral-200 rounded my-8 shadow px-6">
       <h2 className="font-semibold text-lg">Catálogo de productos</h2>
       <Accordion type="multiple" className="w-full">
-        {products.map((prod) => {
-          const grouped = new Map<string, string[]>();
-          const factorIds =
-            (prod.qualityFactorsId as unknown as string[]) ?? [];
-          for (const id of factorIds) {
-            const info = factorIdToInfo.get(id);
-            if (!info) continue;
-            const arr = grouped.get(info.categoryName) ?? [];
-            arr.push(info.name);
-            grouped.set(info.categoryName, arr);
-          }
-
-          const rows = Array.from(grouped.entries()).sort((a, b) =>
-            a[0].localeCompare(b[0]),
-          );
-
-          return (
-            <AccordionItem key={prod._id} value={prod._id as string}>
-              <AccordionTrigger className="text-xs font-medium">
-                {prod.name} | {prod.sku}
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                {rows.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    Sin factores de calidad
-                  </p>
-                ) : (
-                  <ul className="list-disc pl-6 space-y-1 text-gray text-xs">
-                    {rows.map(([cat, names]) => (
-                      <li key={cat}>
-                        {cat}: {names.join(", ")}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
+        <AccordionItem value="raw-materials">
+          <AccordionTrigger className="font-semibold">
+            Materias Primas
+          </AccordionTrigger>
+          <AccordionContent>
+            <ProductCategorySection
+              title="Materias Primas"
+              products={rawMaterials}
+              factorIdToInfo={factorIdToInfo}
+            />
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="by-products">
+          <AccordionTrigger className="font-semibold">
+            Subproductos
+          </AccordionTrigger>
+          <AccordionContent>
+            <ProductCategorySection
+              title="Subproductos"
+              products={byProducts}
+              factorIdToInfo={factorIdToInfo}
+            />
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="finished-goods">
+          <AccordionTrigger className="font-semibold">
+            Productos Terminados
+          </AccordionTrigger>
+          <AccordionContent>
+            <ProductCategorySection
+              title="Productos Terminados"
+              products={finishedGoods}
+              factorIdToInfo={factorIdToInfo}
+            />
+          </AccordionContent>
+        </AccordionItem>
       </Accordion>
     </div>
   );

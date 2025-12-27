@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-table";
 import { useMemo } from "react";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
+import { convertFromCanonical, WeightUnit } from "@/lib/units";
 
 // Define the type for our flattened dispatch history data
 type DispatchHistoryRow = {
@@ -51,10 +52,18 @@ export default function DispatchHistoryTable() {
         header: () => <span>Producto</span>,
         cell: (info) => info.getValue(),
     }),
-    columnHelper.accessor((row) => `${row.quantityDispatched} ${row.unit}`, {
+    columnHelper.accessor("quantityDispatched", {
       id: "quantity",
       header: () => <span>Cantidad</span>,
-      cell: (info) => info.getValue(),
+      cell: (info) => {
+        const quantity = info.getValue();
+        const { unit } = info.row.original;
+        if (quantity === null || quantity === undefined) return "N/A";
+        const displayValue = parseFloat(
+          convertFromCanonical(quantity, unit as WeightUnit).toPrecision(10)
+        );
+        return `${displayValue} ${unit}`;
+      }
     }),
   ], []);
 

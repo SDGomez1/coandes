@@ -10,6 +10,7 @@ import {
 import { ChevronRight } from "lucide-react";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
+import EditSupplier from "./EditSupplier";
 
 export default function SupplierTable() {
   const org = useQuery(api.organizations.getOrg);
@@ -38,13 +39,16 @@ export default function SupplierTable() {
         {suppliers.map((supplier) => {
           return (
             <AccordionItem key={supplier._id} value={supplier._id as string}>
-              <AccordionTrigger
-                className="text-xs font-medium flex justify-baseline gap-2 items-center"
-                showChevronIcon={false}
-              >
-                <ChevronRight className="size-4 text-primary" />
-                {supplier.name}
-              </AccordionTrigger>
+              <div className="flex justify-between items-center">
+                <AccordionTrigger
+                  className="text-xs font-medium flex justify-baseline gap-2 items-center"
+                  showChevronIcon={false}
+                >
+                  <ChevronRight className="size-4 text-primary" />
+                  {supplier.name}
+                </AccordionTrigger>
+                <EditSupplier supplier={supplier} />
+              </div>
               <AccordionContent className="px-4 pb-4">
                 <p className="text-gray text-xs whitespace-pre-wrap">
                   {supplier.details || "No hay detalles adicionales."}

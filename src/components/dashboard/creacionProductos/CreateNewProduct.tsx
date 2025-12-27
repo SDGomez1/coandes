@@ -25,17 +25,18 @@ import { CancelConfirmation } from "./CancelConfirmation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
+import { convertToCanonical } from "@/lib/units";
 
 // ------------------- Schema -------------------
 
 const productSchema = z.object({
   productName: z.string().min(1, "El nombre es requerido"),
   sku: z.string().min(1, "El código es requerido"),
-  type: z.enum(["Raw Material", "Intermediate", "Finished Good", "By-product"]),
-  unitBase: z.string().min(1),
+  type: z.enum(["Raw Material", "Finished Good", "By-product"]),
+  unitBase: z.enum(["g", "kg", "lb", "oz", "ton"]),
   presentation: z.string(),
   equivalence: z.string(),
-  averageWeight: z.string(),
+  averageWeight: z.number().nonnegative(),
   qualityFactorsId: z.array(z.string()),
   outputProductIds: z.array(z.string()).optional(),
 });
@@ -59,8 +60,8 @@ export default function CreateNewProduct({}) {
       type: "Raw Material",
       equivalence: "1",
       presentation: "",
-      averageWeight: "50",
-      unitBase: "",
+      averageWeight: 5,
+      unitBase: "kg",
       qualityFactorsId: [],
       outputProductIds: [],
     },
@@ -71,7 +72,7 @@ export default function CreateNewProduct({}) {
 
   const productType = useWatch({ control, name: "type" });
   const isProducible =
-    productType === "Raw Material" || productType === "Intermediate";
+    productType === "Raw Material" || productType === "By-product";
   const maxSteps = isProducible ? 4 : 3;
 
   const stepFields: Record<number, (keyof ProductFormType)[]> = {
@@ -92,9 +93,7 @@ export default function CreateNewProduct({}) {
 
   const onSubmit = async (data: ProductFormType) => {
     try {
-      // 1. Create the main product
       const newProductId = await createProduct({
-        // TODO: Get organizationId from user session/auth
         organizationId: org?._id as Id<"organizations">,
         name: data.productName,
         sku: data.sku,
@@ -102,13 +101,12 @@ export default function CreateNewProduct({}) {
         baseUnit: data.unitBase,
         presentation: data.presentation,
         equivalence: data.equivalence ?? "",
-        averageWeigth: data.averageWeight ?? "",
+        averageWeigth: convertToCanonical(data.averageWeight, data.unitBase),
         qualityFactorsId: data.qualityFactorsId.map(
           (s) => s as Id<"qualityFactors">,
         ),
       });
 
-      // 2. If it's a producible item, define its outputs
       if (
         isProducible &&
         data.outputProductIds &&
@@ -116,7 +114,6 @@ export default function CreateNewProduct({}) {
       ) {
         for (const outputId of data.outputProductIds) {
           await defineProductOutput({
-            // TODO: Get organizationId from user session/auth
             organizationId: org?._id as Id<"organizations">,
             inputProductId: newProductId,
             outputProductId: outputId as Id<"products">,
@@ -124,7 +121,6 @@ export default function CreateNewProduct({}) {
         }
       }
 
-      console.log("Product created successfully:", newProductId);
       setStep(1);
       reset();
       setOpen(false);

@@ -17,7 +17,6 @@ export const createQualityCategoriesWithFactors = mutation({
   },
   handler: async (ctx, args) => {
     const { categories } = args;
-        console.log("test")
     const org = await ctx.db.query("organizations").first();
     if (!org) throw new Error("Organization not found");
     if (org.active === false) throw new Error("Organization is not active");
@@ -63,46 +62,90 @@ export const createQualityCategoriesWithFactors = mutation({
     };
   },
 });
-export const createQualityFactor = mutation({
+
+export const editQualityCategoryWithFactors = mutation({
   args: {
-    qfCategoryId: v.id("qualityFactorsCategory"),
-    name: v.string(),
-    unit: v.optional(v.string()),
+    category: v.object({
+      id: v.id("qualityFactorsCategory"),
+      name: v.string(),
+      factors: v.array(
+        v.object({
+          id: v.optional(v.id("qualityFactors")),
+          name: v.string(),
+          unit: v.optional(v.string()),
+        }),
+      ),
+    }),
   },
   handler: async (ctx, args) => {
-    const cat = await ctx.db.get(args.qfCategoryId);
-    if (!cat) throw new Error("Quality factors category not found");
+    const org = await ctx.db.query("organizations").first();
+    if (!org) throw new Error("Organization not found");
+    if (org.active === false) throw new Error("Organization is not active");
 
-    const existing = await ctx.db
+    await ctx.db.patch(args.category.id, { name: args.category.name });
+    const existingFactors = await ctx.db
       .query("qualityFactors")
-      .withIndex("by_qfCat", (q) => q.eq("qfCategoryId", args.qfCategoryId))
-      .filter((q) => q.eq(q.field("name"), args.name))
-      .first();
+      .withIndex("by_qfCat", (q) => q.eq("qfCategoryId", args.category.id))
+      .collect();
 
-    if (existing) {
-      throw new Error(
-        `Quality factor "${args.name}" already exists in this category`,
-      );
+    const newFactorIds = new Set(
+      args.category.factors.filter((f) => f.id).map((f) => f.id!),
+    );
+
+    for (const factor of args.category.factors) {
+      if (factor.id) {
+        await ctx.db.patch(factor.id, {
+          name: factor.name,
+          unit: factor.unit,
+        });
+      } else {
+        await ctx.db.insert("qualityFactors", {
+          qfCategoryId: args.category.id,
+          name: factor.name,
+          unit: factor.unit,
+        });
+      }
     }
 
-    const id = await ctx.db.insert("qualityFactors", {
-      qfCategoryId: args.qfCategoryId,
-      name: args.name,
-      unit: args.unit,
-    });
+    for (const oldFactor of existingFactors) {
+      if (!newFactorIds.has(oldFactor._id)) {
+        await ctx.db.delete(oldFactor._id);
+      }
+    }
 
-    return id;
+    return { success: true };
   },
 });
 
-export const listCategoriesByOrganization = query({
-  args: { organizationId: v.id("organizations") },
+export const deleteQualityCategory = mutation({
+  args: {
+    categoryId: v.id("qualityFactorsCategory"),
+  },
   handler: async (ctx, args) => {
-    const categories = await ctx.db
-      .query("qualityFactorsCategory")
-      .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
+    const org = await ctx.db.query("organizations").first();
+    if (!org) throw new Error("Organization not found");
+    if (org.active === false) throw new Error("Organization is not active");
+
+    const categoryToDelete = await ctx.db.get(args.categoryId);
+    if (!categoryToDelete) {
+      throw new Error("Category not found");
+    }
+    if (categoryToDelete.organizationId !== org._id) {
+      throw new Error("Unauthorized");
+    }
+
+    const factors = await ctx.db
+      .query("qualityFactors")
+      .withIndex("by_qfCat", (q) => q.eq("qfCategoryId", args.categoryId))
       .collect();
-    return categories;
+
+    for (const factor of factors) {
+      await ctx.db.delete(factor._id);
+    }
+
+    await ctx.db.delete(args.categoryId);
+
+    return { success: true };
   },
 });
 

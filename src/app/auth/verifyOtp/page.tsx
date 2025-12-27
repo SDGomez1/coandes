@@ -8,12 +8,12 @@ import VerifyOtpForm from "@/components/auth/verifyOtpForm";
 
 export default function Page() {
   return (
-    <section className="flex w-full overflow-y-hidden ">
+    <section className="flex w-full overflow-y-hidden max-h-screen">
       <div className="w-1/2 relative hidden lg:block h-screen">
         <div className="w-full h-full bg-black opacity-60 absolute"></div>
         <Image src={BGImage} alt="logo" className="w-full " />
       </div>
-      <div className="lg:w-1/2 flex flex-col py-11 lg:px-20 px-6">
+      <div className="lg:w-1/2 flex flex-col py-11 lg:px-20 px-6 overflow-y-auto">
         <div className="flex items-center justify-center max-w-screen ">
           <span className="bg-primary size-10 lg:size-16 rounded-full flex justify-center items-center text-white  text-lg lg:text-2xl font-medium shrink-0">
             1
@@ -33,7 +33,7 @@ export default function Page() {
         <Separator className="bg-primary/40" />
         <Link
           href={"/"}
-          className="h-16 mt-9 w-full border  rounded-lg text-primary flex justify-center items-center gap-2 border-primary"
+          className="h-16 mt-9 w-full border  rounded-lg text-primary flex justify-center items-center gap-2 border-primary shrink-0"
         >
           Cambiar correo electrónico
         </Link>

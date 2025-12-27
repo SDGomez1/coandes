@@ -1,7 +1,6 @@
 "use client";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useMemo } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -9,25 +8,13 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { ChevronRight } from "lucide-react";
+import EditQualityCategory from "./EditQualityCategory";
 
 export default function ParamsTable() {
   const categoriesWithFactors = useQuery(
     api.qualityFactors.listCategoriesWithFactorsByOrganization,
   );
 
-  const factorIdToInfo = useMemo(() => {
-    const map = new Map<string, { name: string; categoryName: string }>();
-    if (!categoriesWithFactors) return map;
-    for (const { category, factors } of categoriesWithFactors) {
-      for (const f of factors) {
-        map.set(f._id as unknown as string, {
-          name: f.name,
-          categoryName: category.name,
-        });
-      }
-    }
-    return map;
-  }, [categoriesWithFactors]);
   if (!categoriesWithFactors || categoriesWithFactors.length <= 0) {
     return (
       <div className="w-full py-6 flex justify-center items-center border border-neutral-200 rounded my-8 shadow">
@@ -46,13 +33,20 @@ export default function ParamsTable() {
               key={factor.category._id}
               value={factor.category._id as string}
             >
-              <AccordionTrigger
-                className="text-xs font-medium flex justify-baseline gap-2 items-center"
-                showChevronIcon={false}
-              >
-                <ChevronRight className="size-4 text-primary"/>
-                {factor.category.name}
-              </AccordionTrigger>
+              <div className="flex justify-between items-center">
+                <AccordionTrigger
+                  className="text-xs font-medium flex justify-baseline gap-2 items-center cursor-pointer "
+                  showChevronIcon={false}
+                >
+                  <ChevronRight className="size-4 text-primary" />
+                  {factor.category.name}
+                </AccordionTrigger>
+                <EditQualityCategory
+                  category={factor.category}
+                  factors={factor.factors}
+                />
+              </div>
+
               <AccordionContent className="px-4 pb-4">
                 {factor.factors.length === 0 ? (
                   <p className="text-sm text-muted-foreground">

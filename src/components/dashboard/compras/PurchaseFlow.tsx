@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
+import { convertToCanonical } from "@/lib/units";
 
 // ------------------- Helper Components -------------------
 
@@ -199,6 +200,10 @@ function PurchaseForm({
       : "skip",
   );
 
+  const selectedProductInfo = useMemo(() => {
+    return rawMaterials.find((e) => e._id == selectedProductId);
+  }, [selectedProductId, rawMaterials]);
+
   const onSubmit = async (data: PurchaseFormValues) => {
     setIsSubmitting(true);
     try {
@@ -213,10 +218,11 @@ function PurchaseForm({
         productId: data.productId as Id<"products">,
         warehouseId: data.warehouseId as Id<"warehouse">,
         lotNumber: data.lotNumber,
-        quantity: data.quantity,
-        unit:
-          rawMaterials.find((p) => p._id === data.productId)?.baseUnit ?? "N/A",
-        qualityFactorValues: data.qualityFactors, // Pass collected quality factors
+        quantity: convertToCanonical(
+          data.quantity,
+          selectedProductInfo.baseUnit,
+        ),
+        qualityFactorValues: data.qualityFactors,
         vehicleInfo: data.vehicleInfo,
       });
 
@@ -229,10 +235,6 @@ function PurchaseForm({
       setIsSubmitting(false);
     }
   };
-
-  const selectedProductInfo = useMemo(() => {
-    return rawMaterials.find((e) => e._id == selectedProductId);
-  }, [selectedProductId]);
 
   return (
     <div className="w-full border border-primary rounded-lg p-7 mt-3">
@@ -288,22 +290,21 @@ function PurchaseForm({
                   )}
                 />
                 <FormField
+                  control={form.control}
                   name="quantity"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
                         Cantidad Recibida{" "}
-                        {selectedProductInfo?.baseUnit && (
-                          <span className="font-normal text-gray-500">
-                            ({selectedProductInfo.baseUnit})
-                          </span>
-                        )}
                         <span className="text-destructive">*</span>
+                        {selectedProductInfo?.baseUnit &&
+                          ` (${selectedProductInfo.baseUnit})`}
                       </FormLabel>
                       <FormControl>
                         <Input
+                          {...field}
                           type="number"
-                          placeholder="1000"
+                          inputMode="decimal"
                           {...form.register("quantity", {
                             valueAsNumber: true,
                           })}

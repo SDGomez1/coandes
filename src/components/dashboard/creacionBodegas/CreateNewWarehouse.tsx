@@ -32,6 +32,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../../../convex/_generated/dataModel";
+import { convertToCanonical, WEIGHT_UNIT_OPTIONS } from "@/lib/units";
 
 const formSchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio").trim(),
@@ -39,7 +40,7 @@ const formSchema = z.object({
     .number()
     .finite("Capacidad inválida")
     .nonnegative("Debe ser 0 o mayor"),
-  unit: z.string().min(1, "La unidad es obligatoria"),
+  unit: z.enum(["g", "kg", "lb", "oz", "ton"]),
   rows: z
     .number()
     .int("Debe ser un número entero")
@@ -60,7 +61,7 @@ export default function CreateNewWarehouse() {
     defaultValues: {
       name: "",
       capacity: 0,
-      unit: "",
+      unit: "kg",
       rows: 1,
     },
     mode: "onSubmit",
@@ -106,8 +107,8 @@ export default function CreateNewWarehouse() {
                     await createWarehouse({
                       organizationId: orgId?._id as Id<"organizations">,
                       name: data.name,
-                      rows: data.rows,
-                      capacity: data.capacity,
+                      row: data.rows,
+                      capacity: convertToCanonical(data.capacity, data.unit),
                       baseUnit: data.unit,
                     });
                     toast.success("Bodega creada correctamente");
@@ -167,14 +168,17 @@ export default function CreateNewWarehouse() {
                           onValueChange={field.onChange}
                         >
                           <SelectTrigger className="w-full shrink">
-                            <SelectValue placeholder="Kilogramo / Kg" />
+                            <SelectValue placeholder="kilogramo/kg" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="kg">Kilogramo / Kg</SelectItem>
-                            <SelectItem value="g">Gramo / g</SelectItem>
-                            <SelectItem value="t">Tonelada / t</SelectItem>
-                            <SelectItem value="lb">Libra / lb</SelectItem>
-                            <SelectItem value="oz">Onza / oz</SelectItem>
+                            {WEIGHT_UNIT_OPTIONS.map((option) => (
+                              <SelectItem
+                                key={option.value}
+                                value={option.value}
+                              >
+                                {option.label}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </FormControl>

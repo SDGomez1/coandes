@@ -27,6 +27,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
+import { UnitAwareInput } from "@/components/ui/UnitAwareInput";
+import { WeightUnit, convertFromCanonical } from "@/lib/units";
 
 // ------------------- Main Component -------------------
 export default function CreateProductionFlow() {
@@ -248,10 +250,14 @@ function ProductionForm() {
                         </FormControl>
                         <SelectContent>
                           {availableLots?.map((lot) => (
-                            <SelectItem
-                              key={lot._id}
-                              value={lot._id}
-                            >{`${lot.lotNumber} (Disp: ${lot.quantity} ${lot.unit})`}</SelectItem>
+                            <SelectItem key={lot._id} value={lot._id}>
+                              {`${lot.lotNumber} (Disp: ${parseFloat(
+                                convertFromCanonical(
+                                  lot.quantity,
+                                  lot.unit as WeightUnit,
+                                ).toPrecision(10),
+                              )} ${lot.unit})`}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -266,21 +272,21 @@ function ProductionForm() {
           {selectedInputLot && (
             <div className="space-y-6 pt-4 border-t">
               <FormField
+                control={form.control}
                 name="quantityConsumed"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Cantidad a Consumir ({selectedInputLot.unit}){" "}
+                      Cantidad a Consumir{" "}
                       <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        {...form.register("quantityConsumed", {
-                          valueAsNumber: true,
-                          max: selectedInputLot.quantity,
-                        })}
+                      <UnitAwareInput
+                        valueInCanonicalUnit={field.value}
+                        onChange={field.onChange}
+                        preferredDisplayUnit={
+                          selectedInputLot.unit as WeightUnit
+                        }
                       />
                     </FormControl>
                     <FormMessage />
@@ -315,12 +321,12 @@ function ProductionForm() {
                           <FormItem>
                             <FormLabel>Cant. Producida</FormLabel>
                             <FormControl>
-                              <Input
-                                type="number"
-                                {...form.register(
-                                  `outputs.${index}.quantityProduced`,
-                                  { valueAsNumber: true },
-                                )}
+                              <UnitAwareInput
+                                valueInCanonicalUnit={field.value}
+                                onChange={field.onChange}
+                                preferredDisplayUnit={
+                                  outputProduct.baseUnit as WeightUnit
+                                }
                               />
                             </FormControl>
                           </FormItem>

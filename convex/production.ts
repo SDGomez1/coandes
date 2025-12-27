@@ -99,7 +99,6 @@ export const createProductionRun = mutation({
           warehouseId: output.warehouseId,
           lotNumber: output.lotNumber,
           quantity: output.quantityProduced,
-          unit: product.baseUnit,
           creationDate: Date.now(),
           source: {
             type: "production",

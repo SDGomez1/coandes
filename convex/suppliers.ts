@@ -2,17 +2,9 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 
-/**
- * Creates a new supplier.
- *
- * @param organizationId - The ID of the organization this supplier belongs to.
- * @param name - The name of the supplier.
- * @param details - Optional details about the supplier.
- * @returns The ID of the newly created supplier.
- */
+
 export const createSupplier = mutation({
   args: {
-    // TODO: Get organizationId from user session/auth
     organizationId: v.id("organizations"),
     name: v.string(),
     details: v.optional(v.string()),
@@ -27,15 +19,33 @@ export const createSupplier = mutation({
   },
 });
 
-/**
- * Fetches all suppliers for a given organization.
- *
- * @param organizationId - The ID of the organization.
- * @returns A list of suppliers.
- */
+
+export const editSupplier = mutation({
+  args: {
+    supplierId: v.id("suppliers"),
+    name: v.optional(v.string()),
+    details: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { supplierId, ...rest } = args;
+    await ctx.db.patch(supplierId, rest);
+    return supplierId;
+  },
+});
+
+
+export const deleteSupplier = mutation({
+  args: {
+    supplierId: v.id("suppliers"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.supplierId);
+  },
+});
+
+
 export const getSuppliers = query({
   args: {
-    // TODO: Get organizationId from user session/auth
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {

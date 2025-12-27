@@ -66,30 +66,30 @@ export default function VerifyOtpForm() {
                       <InputOTPGroup className="gap-6">
                         <InputOTPSlot
                           index={0}
-                          className="!rounded-lg border-[#858997] lg:h-16 w-auto aspect-[31/36] lg:text-4xl text-gray border"
+                          className="!rounded-lg border-[#858997] xl:h-16 w-auto aspect-[31/36] xl:text-4xl text-gray border"
                         />
                         <InputOTPSlot
                           index={1}
-                          className="!rounded-lg border-[#858997] lg:h-16 w-auto aspect-[31/36] lg:text-4xl text-gray border "
+                          className="!rounded-lg border-[#858997] xl:h-16 w-auto aspect-[31/36] xl:text-4xl text-gray border "
                         />
                         <InputOTPSlot
                           index={2}
-                          className="!rounded-lg border-[#858997] lg:h-16 w-auto aspect-[31/36] lg:text-4xl text-gray border"
+                          className="!rounded-lg border-[#858997] xl:h-16 w-auto aspect-[31/36] xl:text-4xl text-gray border"
                         />
                       </InputOTPGroup>
                       <InputOTPSeparator />
                       <InputOTPGroup className="gap-6">
                         <InputOTPSlot
                           index={3}
-                          className="!rounded-lg border-[#858997] lg:h-16 w-auto aspect-[31/36] lg:text-4xl text-gray border"
+                          className="!rounded-lg border-[#858997] xl:h-16 w-auto aspect-[31/36] xl:text-4xl text-gray border"
                         />
                         <InputOTPSlot
                           index={4}
-                          className="!rounded-lg border-[#858997] lg:h-16 w-auto aspect-[31/36] lg:text-4xl text-gray border"
+                          className="!rounded-lg border-[#858997] xl:h-16 w-auto aspect-[31/36] xl:text-4xl text-gray border"
                         />
                         <InputOTPSlot
                           index={5}
-                          className="!rounded-lg border-[#858997] lg:h-16 w-auto aspect-[31/36] lg:text-4xl text-gray border"
+                          className="!rounded-lg border-[#858997] xl:h-16 w-auto aspect-[31/36] xl:text-4xl text-gray border"
                         />
                       </InputOTPGroup>
                     </InputOTP>
@@ -101,7 +101,7 @@ export default function VerifyOtpForm() {
           <Button className="h-16 mb-9 w-full text-white rounded bg-primary font-medium flex justify-center items-center">
             {isLoading ? <LoadingSpinner /> : "Acceder"}
           </Button>
-          <p className="text-primary  underline w-full text-center my-5">
+          <p className="text-primary  underline w-full text-center my-5 hidden">
             Reenviar código (00:30)
           </p>
         </form>

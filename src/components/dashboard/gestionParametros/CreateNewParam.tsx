@@ -22,15 +22,10 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Form } from "@/components/ui/form";
-
-// Convex
 import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-
-// Sonner
 import { toast } from "sonner";
 
-// SCHEMA: categories -> factors
 const factorSchema = z.object({
   name: z.string().min(1, "El nombre del factor es requerido"),
   unit: z.string().optional(),
