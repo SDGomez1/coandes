@@ -28,6 +28,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
+import { formatNumber } from "@/lib/utils";
 
 // Define the type for our flattened purchase history data
 type PurchaseHistoryRow = {
@@ -44,7 +45,6 @@ type PurchaseHistoryRow = {
 
 const columnHelper = createColumnHelper<PurchaseHistoryRow>();
 
-// --- Pagination Controls Component ---
 function PaginationControls<T>({ table }: { table: Table<T> }) {
   const pageIndex = table.getState().pagination.pageIndex;
   const pageCount = table.getPageCount();
@@ -66,19 +66,31 @@ function PaginationControls<T>({ table }: { table: Table<T> }) {
           pageCount - 1,
         );
       } else {
-        pages.push(0, -1, pageIndex - 1, pageIndex, pageIndex + 1, -1, pageCount - 1);
+        pages.push(
+          0,
+          -1,
+          pageIndex - 1,
+          pageIndex,
+          pageIndex + 1,
+          -1,
+          pageCount - 1,
+        );
       }
     }
     return pages;
   };
 
   const start = pageIndex * table.getState().pagination.pageSize + 1;
-  const end = Math.min(start + table.getState().pagination.pageSize - 1, table.getFilteredRowModel().rows.length);
+  const end = Math.min(
+    start + table.getState().pagination.pageSize - 1,
+    table.getFilteredRowModel().rows.length,
+  );
 
   return (
     <div className="flex items-center justify-between p-4">
       <span className="text-sm text-gray-700">
-        Mostrando {start} a {end} de {table.getFilteredRowModel().rows.length} resultados
+        Mostrando {start} a {end} de {table.getFilteredRowModel().rows.length}{" "}
+        resultados
       </span>
       <div className="flex items-center gap-2">
         <Button
@@ -99,7 +111,9 @@ function PaginationControls<T>({ table }: { table: Table<T> }) {
         </Button>
         {getPageNumbers().map((page, i) =>
           page === -1 ? (
-            <span key={`ellipsis-${i}`} className="px-2">...</span>
+            <span key={`ellipsis-${i}`} className="px-2">
+              ...
+            </span>
           ) : (
             <Button
               key={page}
@@ -134,10 +148,12 @@ function PaginationControls<T>({ table }: { table: Table<T> }) {
           }}
         >
           <SelectTrigger className="w-28">
-            <SelectValue />
+            <SelectValue
+              placeholder={`${table.getState().pagination.pageSize} / página`}
+            />
           </SelectTrigger>
           <SelectContent>
-            {[2, 20, 30, 40, 50].map((size) => (
+            {[5, 20, 30, 40, 50].map((size) => (
               <SelectItem key={size} value={String(size)}>
                 {size} / página
               </SelectItem>
@@ -148,7 +164,6 @@ function PaginationControls<T>({ table }: { table: Table<T> }) {
     </div>
   );
 }
-
 
 export default function PurchaseHistoryTable() {
   const organization = useQuery(api.organizations.getOrg);
@@ -187,15 +202,13 @@ export default function PurchaseHistoryTable() {
       }),
       columnHelper.accessor("quantity", {
         id: "weight",
-        header: () => <span>Peso</span>,
+        header: () => <span>Peso (kg)</span>,
         cell: (info) => {
           const quantity = info.getValue();
-          const { unit } = info.row.original;
           if (quantity === null || quantity === undefined) return "N/A";
-          const displayValue = parseFloat(
-            convertFromCanonical(quantity, unit as WeightUnit).toPrecision(10),
-          );
-          return `${displayValue} ${unit}`;
+          const displayValue = formatNumber(convertFromCanonical(quantity, "kg"))
+
+          return `${displayValue}`;
         },
       }),
     ],
@@ -278,4 +291,3 @@ export default function PurchaseHistoryTable() {
     </div>
   );
 }
-

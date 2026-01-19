@@ -17,7 +17,8 @@ import WarehouseInventoryTable from "@/components/dashboard/bodega/WarehouseInve
 import { Id } from "../../../../convex/_generated/dataModel";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
+import { convertFromCanonical, convertToCanonical } from "@/lib/units";
 
 export default function Page() {
   const organization = useQuery(api.organizations.getOrg);
@@ -41,10 +42,9 @@ export default function Page() {
       : "skip",
   );
 
-  const currentAmount =
-    Number(warehouseInventoryData?.totalQuantity as number) ?? 0;
+  const currentAmount = Number(warehouseInventoryData?.totalQuantity) ?? 0;
   const maxCapacity = selectedWarehouse?.capacity ?? 0;
-  const unit = selectedWarehouse?.baseUnit ?? "";
+  const unit = selectedWarehouse?.baseUnit ?? "g";
   const percentageUsage =
     maxCapacity > 0 ? (currentAmount / maxCapacity) * 100 : 0;
 
@@ -108,13 +108,14 @@ export default function Page() {
                 <span>
                   Actual:{" "}
                   <span className="font-semibold">
-                    {currentAmount} {unit}
+                    {formatNumber(convertFromCanonical(currentAmount, unit))}{" "}
+                    {unit}
                   </span>
                 </span>
                 <span>
                   Capacidad:{" "}
                   <span className="font-semibold">
-                    {maxCapacity} {unit}
+                    {formatNumber(maxCapacity)} {unit}
                   </span>
                 </span>
               </div>

@@ -114,7 +114,6 @@ export const getWarehouseInventory = query({
           productType: product?.type ?? "Tipo desconocido",
           supplierName: supplierName,
           quantity: lot.quantity,
-          unit: lot.unit,
         };
       })
     );
