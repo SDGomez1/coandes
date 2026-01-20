@@ -7,6 +7,7 @@ import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
+  getFilteredRowModel,
   getPaginationRowModel,
   useReactTable,
   Table,
@@ -15,218 +16,252 @@ import { useMemo, useState } from "react";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { convertFromCanonical, WeightUnit } from "@/lib/units";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { PaginationControls } from "./PaginationControls";
+import { useRouter } from "next/navigation";
+import { getSortedRowModel, SortingState } from "@tanstack/react-table";
 
-// Define the type for our flattened warehouse inventory data
 type WarehouseInventoryRow = {
-    _id: Id<"inventoryLots">;
-    lotNumber: string;
-    productName: string;
-    productType: string;
-    supplierName: string;
-    quantity: number;
-    unit: string;
+  _id: Id<"inventoryLots">;
+  lotNumber: string;
+  productName: string;
+  productType: string;
+  supplierName: string;
+  quantity: number;
 };
 
 const columnHelper = createColumnHelper<WarehouseInventoryRow>();
 
-function PaginationControls<T>({ table }: { table: Table<T> }) {
-  const pageIndex = table.getState().pagination.pageIndex;
-  const pageCount = table.getPageCount();
-
-  const getPageNumbers = () => {
-    const pages = [];
-    if (pageCount <= 5) {
-      for (let i = 0; i < pageCount; i++) pages.push(i);
-    } else {
-      if (pageIndex < 3) {
-        pages.push(0, 1, 2, 3, -1, pageCount - 1);
-      } else if (pageIndex >= pageCount - 3) {
-        pages.push(
-          0,
-          -1,
-          pageCount - 4,
-          pageCount - 3,
-          pageCount - 2,
-          pageCount - 1,
-        );
-      } else {
-        pages.push(
-          0,
-          -1,
-          pageIndex - 1,
-          pageIndex,
-          pageIndex + 1,
-          -1,
-          pageCount - 1,
-        );
-      }
-    }
-    return pages;
-  };
-
-  const start = pageIndex * table.getState().pagination.pageSize + 1;
-  const end = Math.min(
-    start + table.getState().pagination.pageSize - 1,
-    table.getFilteredRowModel().rows.length,
-  );
-
-  return (
-    <div className="flex items-center justify-between p-4">
-      <span className="text-sm text-gray-700">
-        Mostrando {start} a {end} de {table.getFilteredRowModel().rows.length}{" "}
-        resultados
-      </span>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => table.setPageIndex(0)}
-          disabled={!table.getCanPreviousPage()}
-        >
-          <ChevronsLeft className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-        >
-          <ChevronLeftIcon className="h-4 w-4" />
-        </Button>
-        {getPageNumbers().map((page, i) =>
-          page === -1 ? (
-            <span key={`ellipsis-${i}`} className="px-2">
-              ...
-            </span>
-          ) : (
-            <Button
-              key={page}
-              variant={page === pageIndex ? "default" : "outline"}
-              size="icon"
-              onClick={() => table.setPageIndex(page)}
-            >
-              {page + 1}
-            </Button>
-          ),
-        )}
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-        >
-          <ChevronRightIcon className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => table.setPageIndex(pageCount - 1)}
-          disabled={!table.getCanNextPage()}
-        >
-          <ChevronsRight className="h-4 w-4" />
-        </Button>
-        <Select
-          value={String(table.getState().pagination.pageSize)}
-          onValueChange={(value) => {
-            table.setPageSize(Number(value));
-          }}
-        >
-          <SelectTrigger className="w-28">
-            <SelectValue
-              placeholder={`${table.getState().pagination.pageSize} / página`}
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {[5, 20, 30, 40, 50].map((size) => (
-              <SelectItem key={size} value={String(size)}>
-                {size} / página
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
-  );
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
-
-
-export default function WarehouseInventoryTable({ warehouseId, organizationId }: { warehouseId: Id<"warehouse">, organizationId: Id<"organizations"> }) {
-  const data = useQuery(
-    api.inventory.getWarehouseInventory,
-    warehouseId && organizationId ? { warehouseId, organizationId } : "skip"
+export default function WarehouseInventoryTable({
+  warehouseId,
+  organizationId,
+}: {
+  warehouseId: Id<"warehouse">;
+  organizationId: Id<"organizations">;
+}) {
+  const warehouses = useQuery(api.warehouse.getAvailableWarehose, {});
+  const selectedWarehouse = warehouses?.find(
+    (w) => w._id === warehouseId,
   );
 
-  const columns = useMemo(() => [
-    columnHelper.accessor("lotNumber", {
-      header: () => <span>No. Tiquete</span>,
-      cell: (info) => info.getValue(),
-    }),
-    columnHelper.accessor(
-      (row) => `${row.productName} / ${row.supplierName}`,
-      {
-        id: "itemSupplier",
-        header: () => <span>Item/Proveedor</span>,
-        cell: (info) => <em>{info.getValue()}</em>,
-      }
-    ),
-    columnHelper.accessor("productType", {
-      header: () => <span>Tipo de Producto</span>,
-      cell: (info) => info.getValue(),
-    }),
-    columnHelper.accessor("quantity", {
-      id: "currentWeight",
-      header: () => <span>Peso Actual</span>,
-      cell: (info) => {
-        const quantity = info.getValue();
-        const { unit } = info.row.original;
-        if (quantity === null || quantity === undefined) return "N/A";
-        const displayValue = parseFloat(
-          convertFromCanonical(quantity, unit as WeightUnit).toPrecision(10)
-        );
-        return `${displayValue} ${unit}`;
-      },
-    }),
-  ], []);
+  const data = useQuery(
+    api.inventory.getWarehouseInventory,
+    warehouseId && organizationId ? { warehouseId, organizationId } : "skip",
+  );
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const router = useRouter();
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("lotNumber", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            No. Tiquete
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => info.getValue(),
+      }),
+      columnHelper.accessor(
+        (row) => `${row.productName} / ${row.supplierName}`,
+        {
+          id: "itemSupplier",
+          header: ({ column }) => (
+            <Button
+              variant="ghost"
+              onClick={() =>
+                column.toggleSorting(column.getIsSorted() === "asc")
+              }
+            >
+              Item/Proveedor
+              {column.getIsSorted() === "asc" ? (
+                <ArrowUp className="ml-2 h-4 w-4" />
+              ) : (
+                <ArrowDown className="ml-2 h-4 w-4" />
+              )}
+            </Button>
+          ),
+          cell: (info) => <em>{info.getValue()}</em>,
+        },
+      ),
+      columnHelper.accessor("productType", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Tipo de Producto
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => info.getValue(),
+      }),
+      columnHelper.accessor("quantity", {
+        id: "currentWeight",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Peso (Unidad original)
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => {
+          const quantity = info.getValue();
+          if (quantity === null || quantity === undefined) return "N/A";
+          const displayValue = convertFromCanonical(
+            quantity,
+            selectedWarehouse?.baseUnit as WeightUnit,
+          );
+          return <em>{`${formatNumber(displayValue)} ${selectedWarehouse?.baseUnit}`}</em>;
+        },
+      }),
+      columnHelper.accessor("quantity", {
+        id: "weightInKg",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Peso (KG)
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => {
+          const quantity = info.getValue();
+          if (quantity === null || quantity === undefined) return "N/A";
+          const displayValue = convertFromCanonical(
+            quantity,
+            "kg" as WeightUnit,
+          );
+          return <em>{`${formatNumber(displayValue)} kg`}</em>;
+        },
+      }),
+      columnHelper.display({
+        id: "actions",
+        header: () => <span>Acciones</span>,
+        cell: (info) => (
+          <Button
+            onClick={() =>
+              router.push(`/dashboard/bodega/lote/${info.row.original._id}`)
+            }
+          >
+            Ver
+          </Button>
+        ),
+      }),
+    ],
+    [router],
+  );
 
   const table = useReactTable({
     data: data?.items ?? [],
     columns,
+    state: {
+      sorting,
+      globalFilter,
+    },
+    onSortingChange: setSorting,
+    getSortedRowModel: getSortedRowModel(),
+    globalFilterFn: (row, columnId, filterValue) => {
+      const normalizedFilterValue = filterValue
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+
+      const columns = table.getAllLeafColumns();
+      const searchInRow = (row: any) => {
+        for (const column of columns) {
+          const cellValue = row.getValue(column.id);
+          if (cellValue) {
+            const normalizedCellValue = String(cellValue)
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "");
+            if (normalizedCellValue.includes(normalizedFilterValue)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      };
+
+      return searchInRow(row);
+    },
+    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   });
 
   if (data === undefined) {
     return (
-        <div className="w-full mt-8 p-6 flex justify-center items-center border rounded-lg shadow-sm">
-            <LoadingSpinner />
-        </div>
+      <div className="w-full mt-8 p-6 flex justify-center items-center border rounded-lg shadow-sm">
+        <LoadingSpinner />
+      </div>
     );
   }
 
   if (data.items.length === 0) {
     return (
-        <div className="w-full mt-8 p-6 flex justify-center items-center border rounded-lg shadow-sm">
-            <p className="text-sm text-gray-500">No hay inventario en esta bodega.</p>
+      <div className="mt-8 flow-root">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+            {`Inventario de la bodega`}
+          </h2>
         </div>
+        <div className="w-full mt-8 p-6 flex justify-center items-center border rounded-lg shadow-sm">
+          <p className="text-sm text-gray-500">
+            No hay inventario en esta bodega.
+          </p>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="mt-8 flow-root">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          {`Inventario de la bodega`}
+        </h2>
+        <div className="w-full md:w-1/3">
+          <Input
+            placeholder="Buscar por item, proveedor o tiquete..."
+            value={globalFilter ?? ""}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+          />
+        </div>
+      </div>
       <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
         <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
           <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
@@ -244,7 +279,7 @@ export default function WarehouseInventoryTable({ warehouseId, organizationId }:
                           ? null
                           : flexRender(
                               header.column.columnDef.header,
-                              header.getContext()
+                              header.getContext(),
                             )}
                       </th>
                     ))}
@@ -261,7 +296,7 @@ export default function WarehouseInventoryTable({ warehouseId, organizationId }:
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
-                          cell.getContext()
+                          cell.getContext(),
                         )}
                       </td>
                     ))}

@@ -55,17 +55,48 @@ export const getLotDetails = query({
     const product = await ctx.db.get(lot.productId);
     const warehouse = await ctx.db.get(lot.warehouseId);
 
+    let supplierName = "N/A";
+    if (lot.source.type === "purchase") {
+      const purchase = await ctx.db.get(lot.source.purchaseId);
+      if (purchase?.supplierId) {
+        const supplier = await ctx.db.get(purchase.supplierId);
+        supplierName = supplier?.name ?? "N/A";
+      }
+    }
+
     const activity = await ctx.db
       .query("activityLog")
       .withIndex("by_lot", (q) => q.eq("inventoryLotId", args.inventoryLotId))
       .order("desc")
       .collect();
 
+    const activityWithDetails = await Promise.all(
+      activity.map(async (log) => {
+        let details: any = {};
+        if (log.activityType === "purchase") {
+          const purchase = await ctx.db.get(log.sourceId);
+          if (purchase) {
+            const supplier = await ctx.db.get(purchase.supplierId);
+            details.supplierName = supplier?.name ?? "N/A";
+          }
+        } else if (log.activityType === "dispatch") {
+          const dispatch = await ctx.db.get(log.sourceId);
+          if (dispatch) {
+            const customer = await ctx.db.get(dispatch.customerId);
+            details.customerName = customer?.name ?? "N/A";
+          }
+        }
+        return { ...log, details };
+      })
+    );
+
     return {
       ...lot,
       productName: product?.name ?? "Unknown",
+      productType: product?.type ?? "Unknown",
       warehouseName: warehouse?.name ?? "Unknown",
-      history: activity,
+      supplierName: supplierName,
+      history: activityWithDetails,
     };
   },
 });

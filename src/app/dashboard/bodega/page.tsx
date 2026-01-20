@@ -115,7 +115,7 @@ export default function Page() {
                 <span>
                   Capacidad:{" "}
                   <span className="font-semibold">
-                    {formatNumber(maxCapacity)} {unit}
+                    {formatNumber(convertFromCanonical(maxCapacity,unit))} {unit}
                   </span>
                 </span>
               </div>

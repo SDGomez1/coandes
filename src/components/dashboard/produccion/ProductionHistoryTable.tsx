@@ -7,108 +7,251 @@ import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { convertFromCanonical, WeightUnit } from "@/lib/units";
+import { Button } from "@/components/ui/button";
+import { ArrowDown, ArrowUp } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { PaginationControls } from "../bodega/PaginationControls";
+import { formatNumber } from "@/lib/utils";
 
-// Define the type for our flattened history data
 type ProductionHistoryRow = {
-    _id: Id<"productionRuns">;
-    runDate: number;
-    inputProductName: string;
-    inputLotNumber: string;
-    quantityConsumed: number;
-    inputUnit: string;
-    outputs: {
-        productName: string;
-        quantityProduced: number;
-        newLotNumber: string;
-        unit: string;
-    }[];
+  _id: Id<"productionRuns">;
+  runDate: number;
+  inputProductName: string;
+  inputLotNumber: string;
+  quantityConsumed: number;
+  inputUnit: string;
+  outputs: {
+    productName: string;
+    quantityProduced: number;
+    newLotNumber: string;
+    unit: string;
+  }[];
 };
 
-const columnHelper = createColumnHelper<ProductionHistoryRow>();
+type FlatProductionHistoryRow = {
+  runId: Id<"productionRuns">;
+  runDate: number;
+  inputProduct: string;
+  quantityConsumed: { value: number; unit: string };
+  outputProduct: string;
+  quantityProduced: { value: number; unit: string };
+  newLotNumber: string;
+};
+
+const columnHelper = createColumnHelper<FlatProductionHistoryRow>();
 
 export default function ProductionHistoryTable() {
   const organization = useQuery(api.organizations.getOrg);
   const orgId = organization?._id;
 
-  const data = useQuery(
+  const historyData = useQuery(
     api.production.getProductionHistory,
-    orgId ? { organizationId: orgId } : "skip"
+    orgId ? { organizationId: orgId } : "skip",
   );
 
-  const columns = useMemo(() => [
-    columnHelper.accessor("runDate", {
-      header: () => <span>Fecha</span>,
-      cell: (info) => new Date(info.getValue()).toLocaleDateString(),
-    }),
-    columnHelper.accessor(row => `${row.inputProductName} (Lote: ${row.inputLotNumber})`, {
-      id: "inputProduct",
-      header: () => <span>Entrada</span>,
-      cell: (info) => info.getValue(),
-    }),
-    columnHelper.accessor("quantityConsumed", {
-        id: "quantityConsumed",
-        header: () => <span>Cant. Consumida</span>,
-        cell: (info) => {
-            const quantity = info.getValue();
-            const { inputUnit } = info.row.original;
-            if (quantity === null || quantity === undefined) return "N/A";
-            const displayValue = parseFloat(
-                convertFromCanonical(quantity, inputUnit as WeightUnit).toPrecision(10)
-            );
-            return `${displayValue} ${inputUnit}`;
+  const data = useMemo(() => {
+    if (!historyData) return [];
+    return historyData.flatMap((run) =>
+      run.outputs.map((output) => ({
+        runId: run._id,
+        runDate: run.runDate,
+        inputProduct: `${run.inputProductName} (Lote: ${run.inputLotNumber})`,
+        quantityConsumed: {
+          value: run.quantityConsumed,
+          unit: run.inputUnit,
         },
-    }),
-    columnHelper.accessor("outputs", {
-      header: () => <span>Salidas</span>,
-      cell: (info) => (
-        <ul className="list-disc pl-4 space-y-1">
-            {info.getValue().map((output, index) => (
-                <li key={index} className="text-xs">
-                    <span className="font-semibold">{output.productName}:</span>{' '}
-                    {parseFloat(
-                      convertFromCanonical(
-                        output.quantityProduced,
-                        output.unit as WeightUnit
-                      ).toPrecision(10)
-                    )}{' '}
-                    {output.unit}
-                    <span className="text-gray-500"> (Lote: {output.newLotNumber})</span>
-                </li>
-            ))}
-        </ul>
-      ),
-    }),
-  ], []);
+        outputProduct: output.productName,
+        quantityProduced: {
+          value: output.quantityProduced,
+          unit: output.unit,
+        },
+        newLotNumber: output.newLotNumber,
+      })),
+    );
+  }, [historyData]);
+
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [sorting, setSorting] = useState<SortingState>([]);
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor("runDate", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Fecha
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => new Date(info.getValue()).toLocaleDateString(),
+      }),
+      columnHelper.accessor("inputProduct", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Entrada
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => info.getValue(),
+      }),
+      columnHelper.accessor("quantityConsumed", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Cant. Consumida
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => {
+          const { value, unit } = info.getValue();
+          const displayValue = formatNumber(
+            convertFromCanonical(value, unit as WeightUnit),
+          );
+          return `${displayValue} ${unit}`;
+        },
+        sortingFn: "alphanumeric",
+      }),
+      columnHelper.accessor("outputProduct", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Salida
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => info.getValue(),
+      }),
+      columnHelper.accessor("quantityProduced", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Cant. Producida
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => {
+          const { value, unit } = info.getValue();
+          const displayValue = formatNumber(
+            convertFromCanonical(value, unit as WeightUnit),
+          );
+          return `${displayValue} ${unit}`;
+        },
+        sortingFn: "alphanumeric",
+      }),
+      columnHelper.accessor("newLotNumber", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Nuevo Lote
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => info.getValue(),
+      }),
+    ],
+    [],
+  );
 
   const table = useReactTable({
-    data: data ?? [],
+    data,
     columns,
+    state: {
+      sorting,
+      globalFilter,
+    },
+    onSortingChange: setSorting,
+    getSortedRowModel: getSortedRowModel(),
+    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   });
 
-  if (data === undefined) {
+  if (historyData === undefined) {
     return (
-        <div className="w-full mt-8 p-6 flex justify-center items-center border rounded-lg shadow-sm">
-            <LoadingSpinner />
-        </div>
+      <div className="w-full mt-8 p-6 flex justify-center items-center border rounded-lg shadow-sm">
+        <LoadingSpinner />
+      </div>
     );
   }
 
   if (data.length === 0) {
     return (
-        <div className="w-full mt-8 p-6 flex justify-center items-center border rounded-lg shadow-sm">
-            <p className="text-sm text-gray-500">No hay historial de producción para mostrar.</p>
+      <div className="mt-8 flow-root">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+            Historial de Producción
+          </h2>
         </div>
+        <div className="w-full mt-8 p-6 flex justify-center items-center border rounded-lg shadow-sm">
+          <p className="text-sm text-gray-500">
+            No hay historial de producción para mostrar.
+          </p>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="mt-8 flow-root">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+          Historial de Producción
+        </h2>
+        <div className="w-full md:w-1/3">
+          <Input
+            placeholder="Buscar en la producción..."
+            value={globalFilter ?? ""}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+          />
+        </div>
+      </div>
       <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
         <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
           <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
@@ -126,7 +269,7 @@ export default function ProductionHistoryTable() {
                           ? null
                           : flexRender(
                               header.column.columnDef.header,
-                              header.getContext()
+                              header.getContext(),
                             )}
                       </th>
                     ))}
@@ -143,7 +286,7 @@ export default function ProductionHistoryTable() {
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
-                          cell.getContext()
+                          cell.getContext(),
                         )}
                       </td>
                     ))}
@@ -151,6 +294,7 @@ export default function ProductionHistoryTable() {
                 ))}
               </tbody>
             </table>
+            <PaginationControls table={table} />
           </div>
         </div>
       </div>
