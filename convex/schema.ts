@@ -126,6 +126,13 @@ export default defineSchema({
     quantityProduced: v.number(),
     resultingInventoryLotId: v.optional(v.id("inventoryLots")),
   }).index("by_run", ["productionRunId"]),
+
+  lotQuality: defineTable({
+    productionOutputId: v.id("productionOutputs"),
+    qualityFactorId: v.id("qualityFactors"),
+    value: v.string(),
+  }).index("by_production_output", ["productionOutputId"]),
+
   dispatches: defineTable({
     organizationId: v.id("organizations"),
     customerId: v.optional(v.id("customers")),

@@ -29,7 +29,7 @@ export const getWarehouseStock = query({
           productName: product?.name ?? "Unknown Product",
           productSku: product?.sku ?? "N/A",
         };
-      })
+      }),
     );
 
     return lotsWithProductInfo;
@@ -87,7 +87,7 @@ export const getLotDetails = query({
           }
         }
         return { ...log, details };
-      })
+      }),
     );
 
     return {
@@ -146,7 +146,7 @@ export const getWarehouseInventory = query({
           supplierName: supplierName,
           quantity: lot.quantity,
         };
-      })
+      }),
     );
 
     return { items: inventoryData, totalQuantity: totalQuantity };
@@ -175,40 +175,36 @@ export const getLotsForProduct = query({
   },
 });
 
-/**
- * Fetches all "Raw Material" and "Intermediate" products that have active stock.
- *
- * @param organizationId - The ID of the organization.
- * @returns A list of products that can be used as input for production.
- */
 export const getProducibleStock = query({
-    args: {
-        organizationId: v.id("organizations"),
-    },
-    handler: async (ctx, args) => {
-        const allProducibleProducts = await ctx.db
-            .query("products")
-            .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
-            .filter(q => q.or(
-                q.eq(q.field("type"), "Raw Material"),
-                q.eq(q.field("type"), "Intermediate")
-            ))
-            .collect();
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    const allProducibleProducts = await ctx.db
+      .query("products")
+      .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("type"), "Raw Material"),
+          q.eq(q.field("type"), "By-product"),
+        ),
+      )
+      .collect();
 
-        const stockedProducts = [];
+    const stockedProducts = [];
 
-        for (const product of allProducibleProducts) {
-            const activeLot = await ctx.db
-                .query("inventoryLots")
-                .withIndex("by_product", (q) => q.eq("productId", product._id))
-                .filter(q => q.gt(q.field("quantity"), 0))
-                .first(); // .first() is more efficient as we just need to know if at least one exists
+    for (const product of allProducibleProducts) {
+      const activeLot = await ctx.db
+        .query("inventoryLots")
+        .withIndex("by_product", (q) => q.eq("productId", product._id))
+        .filter((q) => q.gt(q.field("quantity"), 0))
+        .first();
 
-            if (activeLot) {
-                stockedProducts.push(product);
-            }
-        }
-        
-        return stockedProducts;
-    },
+      if (activeLot) {
+        stockedProducts.push(product);
+      }
+    }
+
+    return stockedProducts;
+  },
 });

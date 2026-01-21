@@ -34,6 +34,7 @@ type ProductionHistoryRow = {
     quantityProduced: number;
     newLotNumber: string;
     unit: string;
+    qualityFactors: { name: string; value: string }[];
   }[];
 };
 
@@ -45,6 +46,7 @@ type FlatProductionHistoryRow = {
   outputProduct: string;
   quantityProduced: { value: number; unit: string };
   newLotNumber: string;
+  qualityFactors: { name: string; value: string }[];
 };
 
 const columnHelper = createColumnHelper<FlatProductionHistoryRow>();
@@ -75,6 +77,7 @@ export default function ProductionHistoryTable() {
           unit: output.unit,
         },
         newLotNumber: output.newLotNumber,
+        qualityFactors: output.qualityFactors,
       })),
     );
   }, [historyData]);
@@ -193,6 +196,21 @@ export default function ProductionHistoryTable() {
           </Button>
         ),
         cell: (info) => info.getValue(),
+      }),
+      columnHelper.accessor("qualityFactors", {
+        header: "Factores de Calidad",
+        cell: (info) => {
+          const factors = info.getValue();
+          if (factors.length === 0) return "N/A";
+          return (
+            <ul className="list-disc list-inside">
+              {factors.map((f) => (
+                <li key={f.name}>{`${f.name}: ${f.value}`}</li>
+              ))}
+            </ul>
+          );
+        },
+        enableSorting: false,
       }),
     ],
     [],

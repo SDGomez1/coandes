@@ -2,10 +2,6 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 
-/**
- * Creates a production run, consuming an input lot and creating output lots.
- * This is the core transactional function for production.
- */
 export const createProductionRun = mutation({
   args: {
     organizationId: v.id("organizations"),
@@ -18,11 +14,16 @@ export const createProductionRun = mutation({
         quantityProduced: v.number(),
         lotNumber: v.string(),
         warehouseId: v.id("warehouse"),
+        qualityFactors: v.array(
+          v.object({
+            factorId: v.id("qualityFactors"),
+            value: v.string(),
+          }),
+        ),
       }),
     ),
   },
   handler: async (ctx, args) => {
-    // 1. Validate the input lot
     const inputLot = await ctx.db.get(args.inputLotId);
     if (!inputLot) {
       throw new Error("Input inventory lot not found.");
@@ -35,13 +36,12 @@ export const createProductionRun = mutation({
         `Insufficient quantity. Available: ${inputLot.quantity}, Required: ${args.quantityConsumed}`,
       );
     }
-    // 2. check for output lot number uniqueness
     for (const output of args.outputs) {
       const product = await ctx.db.get(output.productId);
       if (!product) {
         throw new Error(`Product with id ${output.productId} not found`);
       }
-      if (product.type !== "By-product" && output.lotNumber) {
+      if (output.lotNumber) {
         const existingLot = await ctx.db
           .query("inventoryLots")
           .withIndex("by_org", (q) =>
@@ -57,7 +57,6 @@ export const createProductionRun = mutation({
       }
     }
 
-    // 3. Create the main production run record
     const productionRunId = await ctx.db.insert("productionRuns", {
       organizationId: args.organizationId,
       runDate: Date.now(),
@@ -66,12 +65,10 @@ export const createProductionRun = mutation({
       notes: args.notes,
     });
 
-    // 4. Decrement the input lot quantity
     await ctx.db.patch(args.inputLotId, {
       quantity: inputLot.quantity - args.quantityConsumed,
     });
 
-    // 5. Log the consumption of the input lot
     await ctx.db.insert("activityLog", {
       organizationId: args.organizationId,
       inventoryLotId: args.inputLotId,
@@ -90,41 +87,46 @@ export const createProductionRun = mutation({
 
       let resultingInventoryLotId: Id<"inventoryLots"> | undefined = undefined;
 
-      // Only create new lots for non-by-products
-      if (product.type !== "By-product") {
-        // Create the new inventory lot for the output
-        resultingInventoryLotId = await ctx.db.insert("inventoryLots", {
-          organizationId: args.organizationId,
-          productId: output.productId,
-          warehouseId: output.warehouseId,
-          lotNumber: output.lotNumber,
-          quantity: output.quantityProduced,
-          creationDate: Date.now(),
-          source: {
-            type: "production",
-            productionRunId: productionRunId,
-          },
-          vehicleInfo: "",
-        });
+      resultingInventoryLotId = await ctx.db.insert("inventoryLots", {
+        organizationId: args.organizationId,
+        productId: output.productId,
+        warehouseId: output.warehouseId,
+        lotNumber: output.lotNumber,
+        quantity: output.quantityProduced,
+        creationDate: Date.now(),
+        source: {
+          type: "production",
+          productionRunId: productionRunId,
+        },
+        vehicleInfo: "",
+      });
 
-        // Log the creation of the new lot
-        await ctx.db.insert("activityLog", {
-          organizationId: args.organizationId,
-          inventoryLotId: resultingInventoryLotId,
-          activityType: "production_in",
-          quantityChange: output.quantityProduced,
-          relatedId: productionRunId,
-          timestamp: Date.now(),
-        });
-      }
+      // Log the creation of the new lot
+      await ctx.db.insert("activityLog", {
+        organizationId: args.organizationId,
+        inventoryLotId: resultingInventoryLotId,
+        activityType: "production_in",
+        quantityChange: output.quantityProduced,
+        relatedId: productionRunId,
+        timestamp: Date.now(),
+      });
 
-      // Create the production output record, linking it to the new lot
-      await ctx.db.insert("productionOutputs", {
+      const outputId = await ctx.db.insert("productionOutputs", {
         productionRunId: productionRunId,
         productId: output.productId,
         quantityProduced: output.quantityProduced,
         resultingInventoryLotId: resultingInventoryLotId,
       });
+
+      if (output.qualityFactors && output.qualityFactors.length > 0) {
+        for (const qf of output.qualityFactors) {
+          await ctx.db.insert("lotQuality", {
+            productionOutputId: outputId,
+            qualityFactorId: qf.factorId,
+            value: qf.value,
+          });
+        }
+      }
     }
 
     return productionRunId;
@@ -163,11 +165,30 @@ export const getProductionHistory = query({
             const lot = output.resultingInventoryLotId
               ? await ctx.db.get(output.resultingInventoryLotId)
               : null;
+
+            const qualityFactors = await ctx.db
+              .query("lotQuality")
+              .withIndex("by_production_output", (q) =>
+                q.eq("productionOutputId", output._id),
+              )
+              .collect();
+
+            const qualityFactorsWithNames = await Promise.all(
+              qualityFactors.map(async (qf) => {
+                const factor = await ctx.db.get(qf.qualityFactorId);
+                return {
+                  name: factor?.name ?? "N/A",
+                  value: qf.value,
+                };
+              }),
+            );
+
             return {
               productName: product?.name ?? "N/A",
               quantityProduced: output.quantityProduced,
               newLotNumber: lot?.lotNumber ?? "N/A (By-product)",
               unit: product?.baseUnit ?? "",
+              qualityFactors: qualityFactorsWithNames,
             };
           }),
         );
