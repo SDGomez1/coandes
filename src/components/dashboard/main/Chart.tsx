@@ -22,14 +22,7 @@ import {
 
 export const description = "Two-line area chart with real Date objects";
 
-const chartData = [
-  { date: new Date(2025, 9, 7), ganado: 3_200_000, costo: 1_800_000 },
-  { date: new Date(2025, 9, 12), ganado: 5_800_000, costo: 2_900_000 },
-  { date: new Date(2025, 9, 17), ganado: 8_000_000, costo: 4_500_000 },
-  { date: new Date(2025, 9, 22), ganado: 5_200_000, costo: 2_600_000 },
-  { date: new Date(2025, 9, 24), ganado: 4_281_953, costo: 1_507_238 },
-  { date: new Date(2025, 10, 2), ganado: 6_900_000, costo: 3_800_000 },
-];
+
 
 const chartConfig = {
   ganado: { label: "Ganado", color: "var(--chart-1)" },
@@ -127,9 +120,9 @@ function CustomTooltip(props: any) {
   );
 }
 
-export function Chart() {
+export function Chart({ chartData }: { chartData: any[] | undefined}) {
   return (
-    <Card className="w-[700px] shrink-0 j">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-3">
           <span className="flex justify-center items-center rounded-full bg-[#F9F7F8] size-10">

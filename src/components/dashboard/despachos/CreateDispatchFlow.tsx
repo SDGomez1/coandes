@@ -139,7 +139,7 @@ function DispatchForm() {
                             <FormControl><SelectTrigger><SelectValue placeholder={!availableLots ? "Cargando lotes..." : "Seleccione un lote..."} /></SelectTrigger></FormControl>
                             <SelectContent>{availableLots?.map(lot => (
                               <SelectItem key={lot._id} value={lot._id}>
-                                {`${lot.lotNumber} (Disponible: ${parseFloat(convertFromCanonical(lot.quantity, lot.unit as WeightUnit).toPrecision(10))} ${lot.unit})`}
+                                {`${lot.lotNumber} (Disponible: ${parseFloat(convertFromCanonical(lot.quantity, "kg").toPrecision(10))} kg)`}
                               </SelectItem>
                             ))}</SelectContent>
                         </Select>
@@ -160,7 +160,7 @@ function DispatchForm() {
                           <UnitAwareInput
                             valueInCanonicalUnit={field.value}
                             onChange={field.onChange}
-                            preferredDisplayUnit={selectedLot?.unit as WeightUnit}
+                            preferredDisplayUnit={"kg"}
                           />
                         </FormControl>
                         <FormMessage />

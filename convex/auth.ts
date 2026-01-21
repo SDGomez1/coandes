@@ -29,7 +29,7 @@ export const createAuth = (
       convex(),
       emailOTP({
         disableSignUp: true,
-        async sendVerificationOTP({ email, otp, type }) {
+        async sendVerificationOTP({ email, otp, type }, ctx) {
           if (type === "sign-in") {
             const subject = "Your sign-in code";
             const html = `<p>Your code is <b>${otp}</b>. It expires in 10 minutes.</p>`;

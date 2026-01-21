@@ -9,26 +9,40 @@ import {
 } from "../ui/breadcrumb";
 import { creationLinks, mainLinks } from "./sidenav/SideNavLinks";
 import { useMemo } from "react";
+import MobileSideNav from "./sidenav/MobileSideNav";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 
 export default function BreadCrumb() {
   const path = usePathname();
+  const isDesktop = useMediaQuery("(min-width: 768px)");
 
   const currentLink = useMemo(() => {
-    const links = [...mainLinks, ...creationLinks, {title: "Configuración", route: "/dashboard/config"}];
+    const links = [
+      ...mainLinks,
+      ...creationLinks,
+      { title: "Configuración", route: "/dashboard/config" },
+    ];
     return links.find((l) => l.route == path);
   }, [path]);
 
   return (
-    <Breadcrumb className="py-8">
-      <BreadcrumbList>
-        <BreadcrumbItem>
-          <BreadcrumbPage className="text-gray text-sm">{currentLink?.title}</BreadcrumbPage>
-        </BreadcrumbItem>
-        <BreadcrumbSeparator>/</BreadcrumbSeparator>
-        <BreadcrumbItem>
-          <BreadcrumbPage className="text-gray text-sm">Coandes</BreadcrumbPage>
-        </BreadcrumbItem>
-      </BreadcrumbList>
-    </Breadcrumb>
+    <div className="flex justify-between items-center">
+      <Breadcrumb className="py-8">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbPage className="text-gray text-sm">
+              {currentLink?.title}
+            </BreadcrumbPage>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator>/</BreadcrumbSeparator>
+          <BreadcrumbItem>
+            <BreadcrumbPage className="text-gray text-sm">
+              Coandes
+            </BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+      {!isDesktop && <MobileSideNav />}
+    </div>
   );
 }

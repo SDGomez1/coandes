@@ -7,7 +7,7 @@ export default function LogOutButton() {
   const router = useRouter();
   return (
     <div
-      className="flex text-gray gap-4 items-center text-sm cursor-pointer"
+      className={`flex text-gray gap-4 items-center text-sm cursor-pointer`}
       onClick={() => {
         authClient.signOut();
         router.replace("/");

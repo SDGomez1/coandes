@@ -67,7 +67,7 @@ export const creationLinks = [
 export default function SideNavLinks() {
   return (
     <>
-      <div className="flex flex-col gap-3">
+      <div className={`flex flex-col gap-3`}>
         {mainLinks.map((data) => (
           <SideNavLink
             title={data.title}
@@ -78,7 +78,7 @@ export default function SideNavLinks() {
         ))}
       </div>
       <Separator />
-      <div className="flex flex-col gap-3">
+      <div className={`flex flex-col gap-3`}>
         {creationLinks.map((data) => (
           <SideNavLink
             title={data.title}

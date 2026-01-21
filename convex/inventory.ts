@@ -37,71 +37,6 @@ export const getWarehouseStock = query({
 });
 
 /**
- * Fetches the details for a single inventory lot, including its full activity history.
- *
- * @param inventoryLotId - The ID of the lot to trace.
- * @returns An object containing the lot details and its full activity log.
- */
-export const getLotDetails = query({
-  args: {
-    inventoryLotId: v.id("inventoryLots"),
-  },
-  handler: async (ctx, args) => {
-    const lot = await ctx.db.get(args.inventoryLotId);
-    if (!lot) {
-      return null;
-    }
-
-    const product = await ctx.db.get(lot.productId);
-    const warehouse = await ctx.db.get(lot.warehouseId);
-
-    let supplierName = "N/A";
-    if (lot.source.type === "purchase") {
-      const purchase = await ctx.db.get(lot.source.purchaseId);
-      if (purchase?.supplierId) {
-        const supplier = await ctx.db.get(purchase.supplierId);
-        supplierName = supplier?.name ?? "N/A";
-      }
-    }
-
-    const activity = await ctx.db
-      .query("activityLog")
-      .withIndex("by_lot", (q) => q.eq("inventoryLotId", args.inventoryLotId))
-      .order("desc")
-      .collect();
-
-    const activityWithDetails = await Promise.all(
-      activity.map(async (log) => {
-        let details: any = {};
-        if (log.activityType === "purchase") {
-          const purchase = await ctx.db.get(log.sourceId);
-          if (purchase) {
-            const supplier = await ctx.db.get(purchase.supplierId);
-            details.supplierName = supplier?.name ?? "N/A";
-          }
-        } else if (log.activityType === "dispatch") {
-          const dispatch = await ctx.db.get(log.sourceId);
-          if (dispatch) {
-            const customer = await ctx.db.get(dispatch.customerId);
-            details.customerName = customer?.name ?? "N/A";
-          }
-        }
-        return { ...log, details };
-      }),
-    );
-
-    return {
-      ...lot,
-      productName: product?.name ?? "Unknown",
-      productType: product?.type ?? "Unknown",
-      warehouseName: warehouse?.name ?? "Unknown",
-      supplierName: supplierName,
-      history: activityWithDetails,
-    };
-  },
-});
-
-/**
  * Fetches inventory data for a specific warehouse, including product and supplier details.
  *
  * @param warehouseId - The ID of the warehouse to query.
@@ -208,3 +143,28 @@ export const getProducibleStock = query({
     return stockedProducts;
   },
 });
+
+export const getInventoryByCategory = query({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    const inventory = await ctx.db
+      .query("inventoryLots")
+      .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
+      .collect();
+    const inventoryByProduct = new Map<string, number>();
+    for (const item of inventory) {
+      const product = await ctx.db.get(item.productId);
+      if (product) {
+        const currentQuantity = inventoryByProduct.get(product.type) ?? 0;
+        inventoryByProduct.set(product.type, currentQuantity + item.quantity);
+      }
+    }
+    return Array.from(inventoryByProduct.entries()).map(([name, value]) => ({
+      name,
+      value,
+    }));
+  },
+});
+

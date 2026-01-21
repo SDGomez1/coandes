@@ -151,3 +151,75 @@ export const getPurchaseHistory = query({
   },
 });
 
+export const getTopSuppliersByPurchase = query({
+    args: {
+        organizationId: v.id("organizations"),
+    },
+    handler: async (ctx, args) => {
+        const purchases = await ctx.db
+            .query("inventoryLots")
+            .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
+            .filter((q) => q.eq(q.field("source.type"), "purchase"))
+            .collect();
+        const suppliers = new Map<string, {name: string, value: number}>();
+        for(const purchase of purchases) {
+            if (purchase.source.type === "purchase") {
+                const p = await ctx.db.get(purchase.source.purchaseId);
+                if (p?.supplierId) {
+                    const supplier = await ctx.db.get(p.supplierId);
+                    if (supplier) {
+                        const currentQuantity = suppliers.get(supplier._id)?.value ?? 0;
+                        suppliers.set(supplier._id, { name: supplier.name, value: currentQuantity + purchase.quantity });
+                    }
+                }
+            }
+        }
+
+        return Array.from(suppliers.values())
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5);
+    }
+});
+
+export const getPurchasesVsDispatches = query({
+    args: {
+        organizationId: v.id("organizations"),
+    },
+    handler: async (ctx, args) => {
+        const purchases = await ctx.db
+            .query("inventoryLots")
+            .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
+            .filter((q) => q.eq(q.field("source.type"), "purchase"))
+            .collect();
+        const dispatches = await ctx.db
+            .query("dispatchLineItems")
+            .collect();
+
+        const data = new Map<string, {ganado: number, costo: number}>();
+
+        for(const purchase of purchases) {
+            const date = new Date(purchase.creationDate);
+            const key = `${date.getFullYear()}-${date.getMonth()}`;
+            const current = data.get(key) ?? { ganado: 0, costo: 0 };
+            data.set(key, { ...current, costo: current.costo + purchase.quantity });
+        }
+
+        for(const dispatch of dispatches) {
+            const d = await ctx.db.get(dispatch.dispatchId);
+            if(d?.organizationId === args.organizationId) {
+                const date = new Date(d.dispatchDate);
+                const key = `${date.getFullYear()}-${date.getMonth()}`;
+                const current = data.get(key) ?? { ganado: 0, costo: 0 };
+                data.set(key, { ...current, ganado: current.ganado + dispatch.quantityDispatched });
+            }
+        }
+        
+        return Array.from(data.entries()).map(([date, values]) => {
+            const [year, month] = date.split('-');
+            return {
+                date: new Date(Number(year), Number(month)).getTime(),
+                ...values
+            }
+        });
+    }
+});

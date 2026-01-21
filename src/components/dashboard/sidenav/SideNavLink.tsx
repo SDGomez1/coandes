@@ -10,9 +10,14 @@ type SideNavLinkProps = {
   title: string;
   route: string;
   icon: ComponentType<{ className?: string }>;
+  isCollapsed?: boolean;
 };
 
-export default function SideNavLink({ title, route, icon: Icon }: SideNavLinkProps) {
+export default function SideNavLink({
+  title,
+  route,
+  icon: Icon,
+}: SideNavLinkProps) {
   const path = usePathname();
 
   return (

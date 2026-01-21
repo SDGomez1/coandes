@@ -208,3 +208,34 @@ export const getProductionHistory = query({
     return history;
   },
 });
+
+export const getProductionVolume = query({
+    args: {
+        organizationId: v.id("organizations"),
+    },
+    handler: async (ctx, args) => {
+        const production = await ctx.db
+            .query("productionOutputs")
+            .collect();
+        
+        const data = new Map<string, number>();
+
+        for(const p of production) {
+            const run = await ctx.db.get(p.productionRunId);
+            if(run?.organizationId === args.organizationId) {
+                const date = new Date(run.runDate);
+                const key = `${date.getFullYear()}-${date.getMonth()}`;
+                const current = data.get(key) ?? 0;
+                data.set(key, current + p.quantityProduced);
+            }
+        }
+
+        return Array.from(data.entries()).map(([date, value]) => {
+            const [year, month] = date.split('-');
+            return {
+                name: new Date(Number(year), Number(month)).toLocaleString('default', { month: 'short' }),
+                value,
+            }
+        });
+    }
+});
