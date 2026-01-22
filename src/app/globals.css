@@ -112,3 +112,22 @@
     --chart-5: oklch(0.645 0.246 16.439);
   }
 }
+
+@theme {
+  /* Sheet / Accordion Keyframes */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+  
+  /* If you want to use the slide-in/out names specifically */
+  --animate-in: enter 150ms ease-out;
+  --animate-out: exit 150ms ease-in;
+}

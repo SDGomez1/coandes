@@ -9,9 +9,18 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
+  getSortedRowModel,
+  SortingState,
   useReactTable,
-  Table,
 } from "@tanstack/react-table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useMemo, useState } from "react";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { convertFromCanonical, WeightUnit } from "@/lib/units";
@@ -20,7 +29,6 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PaginationControls } from "./PaginationControls";
 import { useRouter } from "next/navigation";
-import { getSortedRowModel, SortingState } from "@tanstack/react-table";
 
 type WarehouseInventoryRow = {
   _id: Id<"inventoryLots">;
@@ -250,64 +258,49 @@ export default function WarehouseInventoryTable({
 
   return (
     <div className="mt-8 flow-root">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-          {`Inventario de la bodega`}
-        </h2>
-        <div className="w-full md:w-1/3">
-          <Input
-            placeholder="Buscar por item, proveedor o tiquete..."
-            value={globalFilter ?? ""}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-          />
-        </div>
+      <div className="flex items-center justify-between mb-4">
+        <Input
+          placeholder="Buscar por item, proveedor o tiquete..."
+          value={globalFilter ?? ""}
+          onChange={(e) => setGlobalFilter(e.target.value)}
+          className="max-w-lg"
+        />
       </div>
-      <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-        <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-          <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-            <table className="min-w-full divide-y divide-gray-300">
-              <thead className="bg-gray-50">
+      <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">
+            <Table>
+              <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id}>
+                  <TableRow key={headerGroup.id} className="bg-[#f9f9f9]">
                     {headerGroup.headers.map((header) => (
-                      <th
-                        key={header.id}
-                        scope="col"
-                        className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6"
-                      >
+                      <TableHead key={header.id} className="text-gray">
                         {header.isPlaceholder
                           ? null
                           : flexRender(
                               header.column.columnDef.header,
                               header.getContext(),
                             )}
-                      </th>
+                      </TableHead>
                     ))}
-                  </tr>
+                  </TableRow>
                 ))}
-              </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              </TableHeader>
+              <TableBody>
                 {table.getRowModel().rows.map((row) => (
-                  <tr key={row.id}>
+                  <TableRow key={row.id}>
                     {row.getVisibleCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6"
-                      >
+                      <TableCell key={cell.id}>
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext(),
                         )}
-                      </td>
+                      </TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
             <PaginationControls table={table} />
           </div>
-        </div>
-      </div>
     </div>
   );
 }

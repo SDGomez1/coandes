@@ -7,11 +7,11 @@ import { Separator } from "@/components/ui/separator";
 export default function page() {
   return (
     <>
-      <div className="">
+      <div className="px-4 lg:px-8">
         <BreadCrumb />
+        <Separator />
       </div>
-      <Separator />
-      <div className="py-12 px-9">
+      <div className="py-12 px-4 lg:px-8">
         <h2 className="text-lg font-semibold mb-4">Creación de productos</h2>
         <p className="text-gray-ligth">
           Administra el catálogo de la empresa: crea productos, define

@@ -7,11 +7,11 @@ import { Separator } from "@/components/ui/separator";
 export default function page() {
   return (
     <>
-      <div className="">
+      <div className="px-4 lg:px-8">
         <BreadCrumb />
+        <Separator />
       </div>
-      <Separator />
-      <div className="py-12 px-9">
+      <div className="px-4 py-12 lg:px-8">
         <h2 className="text-lg font-semibold mb-6">Registro de Compras</h2>
         <PurchaseFlow />
         <Separator className="my-12" />

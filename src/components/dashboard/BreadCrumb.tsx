@@ -27,6 +27,7 @@ export default function BreadCrumb() {
 
   return (
     <div className="flex justify-between items-center">
+      {!isDesktop && <MobileSideNav />}
       <Breadcrumb className="py-8">
         <BreadcrumbList>
           <BreadcrumbItem>
@@ -42,7 +43,6 @@ export default function BreadCrumb() {
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      {!isDesktop && <MobileSideNav />}
     </div>
   );
 }

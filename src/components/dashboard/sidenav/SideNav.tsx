@@ -14,9 +14,8 @@ export default function SideNav() {
     <div
       className={`flex flex-col h-full shrink-0 bg-[#FAFAFA] gap-4 overflow-y-auto w-80 px-8 py-6`}
     >
-      <div className="flex flex-col gap-2">
-        <Image src={Logo} alt="logo" className={`w-full`} />
-      </div>
+      <Image src={Logo} alt="logo" className={`w-full`} />
+
       <Separator />
       <SideNavLinks />
       <div className="mt-auto space-y-4">

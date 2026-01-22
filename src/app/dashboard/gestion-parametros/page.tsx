@@ -7,15 +7,15 @@ import { Separator } from "@/components/ui/separator";
 export default function page() {
   return (
     <>
-      <div className="">
+      <div className="px-4 lg:px-8">
         <BreadCrumb />
+        <Separator />
       </div>
-      <Separator />
-      <div className="py-12 px-9">
+      <div className="py-12 px-8">
         <h2 className="text-lg font-semibold mb-4">Gestión de parámetros</h2>
         <p className="text-gray-ligth">
-          Administra los parámetros de los productos del catálogo de la
-          empresa, defina parámetros de calidad.{" "}
+          Administra los parámetros de los productos del catálogo de la empresa,
+          defina parámetros de calidad.{" "}
         </p>
         <ParamsTable />
         <div className="flex justify-center">

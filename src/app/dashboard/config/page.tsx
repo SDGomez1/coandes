@@ -5,11 +5,11 @@ import { Separator } from "@/components/ui/separator";
 export default function page() {
   return (
     <>
-      <div className="">
+      <div className="px-4 lg:px-8">
         <BreadCrumb />
+        <Separator />
       </div>
-      <Separator />
-      <div className="py-12 px-9"></div>
+      <div className="py-12 lg:px-8 px-4"></div>
     </>
   );
 }

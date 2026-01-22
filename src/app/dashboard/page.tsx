@@ -9,9 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { BarChart, LineChart, PieChart } from "lucide-react";
 import { useQuery } from "convex/react";
 import { Chart as TrazabilityChart } from "@/components/dashboard/main/Chart";
-import {
-  ChartConfig,
-} from "@/components/ui/chart";
+import { ChartConfig } from "@/components/ui/chart";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -34,36 +32,54 @@ const pieChartConfig = {
 };
 
 const barChartConfig = {
-    value: {
-        label: "Compras",
-    },
+  value: {
+    label: "Compras",
+  },
 };
 
 const lineChartConfig = {
-    value: {
-        label: "Producción",
-    },
+  value: {
+    label: "Producción",
+  },
 };
 
 const formatCurrency = (value: number) => `$${value.toLocaleString()}`;
 
 export default function Page() {
-    const organization = useQuery(api.organizations.getOrg);
-    const orgId = organization?._id as Id<"organizations">;
+  const organization = useQuery(api.organizations.getOrg);
+  const orgId = organization?._id as Id<"organizations">;
 
-    const inventoryByCategory = useQuery(api.inventory.getInventoryByCategory, orgId ? { organizationId: orgId } : "skip");
-    const topSuppliers = useQuery(api.purchases.getTopSuppliersByPurchase, orgId ? { organizationId: orgId } : "skip");
-    const productionVolume = useQuery(api.production.getProductionVolume, orgId ? { organizationId: orgId } : "skip");
-    const purchasesVsDispatches = useQuery(api.purchases.getPurchasesVsDispatches, orgId ? { organizationId: orgId } : "skip");
+  const inventoryByCategory = useQuery(
+    api.inventory.getInventoryByCategory,
+    orgId ? { organizationId: orgId } : "skip",
+  );
+  const topSuppliers = useQuery(
+    api.purchases.getTopSuppliersByPurchase,
+    orgId ? { organizationId: orgId } : "skip",
+  );
+  const productionVolume = useQuery(
+    api.production.getProductionVolume,
+    orgId ? { organizationId: orgId } : "skip",
+  );
+  const purchasesVsDispatches = useQuery(
+    api.purchases.getPurchasesVsDispatches,
+    orgId ? { organizationId: orgId } : "skip",
+  );
 
   return (
     <>
-      <BreadCrumb />
-      <Separator />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6">
+      <div className="lg:px-8 px-4">
+        <BreadCrumb />
+        <Separator />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 lg:px-8 px-4">
         <TrazabilityChart chartData={purchasesVsDispatches} />
         <CustomPieChart
-          data={inventoryByCategory?.map((item) => ({ ...item, fill: "#000" })) ?? []}
+          data={
+            inventoryByCategory?.map((item) => ({ ...item, fill: "#000" })) ??
+            []
+          }
           chartConfig={pieChartConfig as ChartConfig}
           title="Inventario por Categoría"
           icon={<PieChart className="h-5 w-5 text-muted-foreground" />}

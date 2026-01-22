@@ -58,14 +58,14 @@ export default function Page() {
 
   return (
     <>
-      <div className="">
+      <div className="lg:px-8 px-4">
         <BreadCrumb />
+        <Separator />
       </div>
-      <Separator />
-      <div className="py-12 px-9">
+      <div className="py-12 lg:px-8 px-4">
         <h2 className="text-lg font-semibold mb-6">Inventario por Bodega</h2>
 
-        <div className="mb-8">
+        <div className="mb-8 space-y-2">
           <Label>
             Seleccionar Bodega <span className="text-destructive">*</span>
           </Label>
@@ -110,7 +110,7 @@ export default function Page() {
               <span>
                 Capacidad:{" "}
                 <span className="font-semibold">
-                  {formatNumber(convertFromCanonical(maxCapacity,unit))} {unit}
+                  {formatNumber(convertFromCanonical(maxCapacity, unit))} {unit}
                 </span>
               </span>
             </div>
@@ -132,6 +132,8 @@ export default function Page() {
             </div>
           </div>
         )}
+
+        <h3 className="text-lg font-semibold mb-6">Inventario de la bodega</h3>
 
         {selectedWarehouseId && orgId && (
           <WarehouseInventoryTable
