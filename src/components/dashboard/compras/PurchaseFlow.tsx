@@ -8,7 +8,7 @@ import { z } from "zod";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import { PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -28,9 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
-import { convertToCanonical } from "@/lib/units";
-
-// ------------------- Helper Components -------------------
+import { convertFromCanonical, convertToCanonical } from "@/lib/units";
 
 const PrerequisitesMissing = ({ missing }: { missing: string[] }) => {
   const itemToPath: Record<string, string> = {
@@ -59,20 +57,18 @@ const PrerequisitesMissing = ({ missing }: { missing: string[] }) => {
   );
 };
 
-// ------------------- Main Component -------------------
-
 export default function PurchaseFlow() {
   const [isCreating, setIsCreating] = useState(false);
 
-  // --- Data Fetching ---
-  const organization = useQuery(api.organizations.getOrg); // Fetch the organization
-  const orgId = organization?._id; // Extract the ID
+  const organization = useQuery(api.organizations.getOrg);
+  const orgId = organization?._id;
 
   const rawMaterials = useQuery(
     api.products.getProductsByType,
     orgId ? { organizationId: orgId, type: "Raw Material" } : "skip",
   );
-  const warehouses = useQuery(api.warehouse.getAvailableWarehose);
+  const warehouses = useQuery(api.warehouse.getAvailableWarehouse);
+
   const suppliers = useQuery(
     api.suppliers.getSuppliers,
     orgId ? { organizationId: orgId } : "skip",
@@ -91,7 +87,7 @@ export default function PurchaseFlow() {
       setIsCreating(false);
     } else {
       if (missingPrerequisites.length > 0 && !isLoadingPrerequisites) {
-        setIsCreating(true); // Show the prerequisites message
+        setIsCreating(true);
       } else if (!isLoadingPrerequisites) {
         setIsCreating(true);
       }
@@ -115,7 +111,7 @@ export default function PurchaseFlow() {
           )}
         >
           {isLoadingPrerequisites ? (
-            <LoadingSpinner className="size-3" />
+            <LoadingSpinner className="size-3 text-black" />
           ) : (
             <PlusIcon
               className={cn(
@@ -145,8 +141,6 @@ export default function PurchaseFlow() {
     </div>
   );
 }
-
-// ------------------- Form Component -------------------
 
 const formSchema = z.object({
   productId: z.string().min(1, "Debe seleccionar un producto."),
@@ -207,6 +201,24 @@ function PurchaseForm({
   const onSubmit = async (data: PurchaseFormValues) => {
     setIsSubmitting(true);
     try {
+      const selectedWarehouse = warehouses.find(
+        (w) => w._id === data.warehouseId,
+      );
+      if (!selectedWarehouse) {
+        toast.error("Bodega no encontrada.");
+        setIsSubmitting(false);
+        return;
+      }
+      const purchaseWeightInGrams = convertToCanonical(data.quantity, "kg");
+      if (purchaseWeightInGrams > selectedWarehouse.capacityLeftInGrams) {
+        toast.error(
+          `No hay suficiente espacio en la bodega. Espacio disponible: ${formatNumber(
+            convertFromCanonical(selectedWarehouse.capacityLeftInGrams, "kg"),
+          )} kg.`,
+        );
+        setIsSubmitting(false);
+        return;
+      }
       const purchaseId = await createPurchase({
         organizationId: orgId,
         supplierId: data.supplierId as Id<"suppliers">,
@@ -218,19 +230,21 @@ function PurchaseForm({
         productId: data.productId as Id<"products">,
         warehouseId: data.warehouseId as Id<"warehouse">,
         lotNumber: data.lotNumber,
-        quantity: convertToCanonical(
-          data.quantity,
-          selectedProductInfo.baseUnit,
-        ),
+        quantity: purchaseWeightInGrams,
         qualityFactorValues: data.qualityFactors,
         vehicleInfo: data.vehicleInfo,
       });
 
       toast.success("Compra registrada y recibida en inventario.");
       form.reset();
-    } catch (error) {
-      console.error("Purchase creation failed:", error);
-      toast.error("Error al registrar la compra.");
+    } catch (e: any) {
+      if (e.message?.includes("already exists")) {
+        toast.error(
+          `El número de tiquete '${data.lotNumber}' ya existe. Por favor, ingrese un número de tiquete diferente.`,
+        );
+      } else {
+        toast.error("Error al registrar la compra.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -255,7 +269,7 @@ function PurchaseForm({
                   defaultValue={field.value}
                 >
                   <FormControl>
-                    <SelectTrigger>
+                    <SelectTrigger className="min-w-40">
                       <SelectValue placeholder="Seleccione un producto..." />
                     </SelectTrigger>
                   </FormControl>
@@ -271,7 +285,6 @@ function PurchaseForm({
             )}
           />
 
-          {/* --- Step 2: Dynamic Fields --- */}
           {selectedProductId && (
             <div className="space-y-6 pt-4 border-t">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -284,7 +297,7 @@ function PurchaseForm({
                         <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder={`1000`} {...field} />
+                        <Input placeholder={`# tiquete`} {...field} />
                       </FormControl>
                     </FormItem>
                   )}
@@ -295,10 +308,9 @@ function PurchaseForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Cantidad Recibida{" "}
+                        Cantidad Recibida (kg){" "}
                         <span className="text-destructive">*</span>
-                        {selectedProductInfo?.baseUnit &&
-                          ` (${selectedProductInfo.baseUnit})`}
+
                       </FormLabel>
                       <FormControl>
                         <Input
@@ -322,7 +334,7 @@ function PurchaseForm({
                         <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="ABC123" {...field} />
+                        <Input placeholder="Placa" {...field} />
                       </FormControl>
                     </FormItem>
                   )}
@@ -347,7 +359,12 @@ function PurchaseForm({
                         <SelectContent>
                           {warehouses.map((w) => (
                             <SelectItem key={w._id} value={w._id}>
-                              {w.name}
+                              {`${w.name} (Disponible: ${formatNumber(
+                                convertFromCanonical(
+                                  w.capacityLeftInGrams,
+                                  "kg",
+                                ),
+                              )}kg)`}
                             </SelectItem>
                           ))}
                         </SelectContent>

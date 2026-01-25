@@ -8,13 +8,13 @@ export default defineSchema({
   }),
   userConfig: defineTable({
     userId: v.string(),
-    organizationId: v.array(v.id("organizations")),
+    organizationId: v.id("organizations"),
     role: v.union(
       v.literal("admin"),
       v.literal("superAdmin"),
       v.literal("user"),
     ),
-  }),
+  }).index("by_userId", ["userId"]),
   qualityFactorsCategory: defineTable({
     organizationId: v.id("organizations"),
     name: v.string(),

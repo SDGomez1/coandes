@@ -7,12 +7,11 @@ import Image from "next/image";
 import UserCard from "./UserCard";
 import LogOutButton from "./LogOutButton";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 
 export default function SideNav() {
   return (
     <div
-      className={`flex flex-col h-full shrink-0 bg-[#FAFAFA] gap-4 overflow-y-auto w-80 px-8 py-6`}
+      className={`lg:flex flex-col h-full shrink-0 bg-[#FAFAFA] gap-4 overflow-y-auto w-80 px-8 py-6 hidden`}
     >
       <Image src={Logo} alt="logo" className={`w-full`} />
 

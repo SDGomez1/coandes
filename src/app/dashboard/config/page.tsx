@@ -1,15 +1,26 @@
-import BreadCrumb from "@/components/dashboard/BreadCrumb";
-import SideNav from "@/components/dashboard/sidenav/SideNav";
-import { Separator } from "@/components/ui/separator";
+import { ConfigPage } from "@/components/dashboard/config/ConfigPage";
+import { api } from "../../../../convex/_generated/api";
+import { Id } from "../../../../convex/_generated/dataModel";
+import { fetchAuthQuery } from "@/lib/auth-server";
 
-export default function page() {
+async function Config() {
+  const userData = await fetchAuthQuery(api.user.getUserData);
+
+  if (!userData) {
+    return <div>Loading...</div>;
+  }
+
+  const typedUserData = {
+    ...userData,
+    userId: userData?._id as Id<"user">,
+  };
+
   return (
-    <>
-      <div className="px-4 lg:px-8">
-        <BreadCrumb />
-        <Separator />
-      </div>
-      <div className="py-12 lg:px-8 px-4"></div>
-    </>
+    <div className="p-4 md:p-10">
+      <h1 className="text-2xl font-bold mb-6">Configuración</h1>
+      <ConfigPage userData={typedUserData} />
+    </div>
   );
 }
+
+export default Config;

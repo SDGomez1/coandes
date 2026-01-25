@@ -55,7 +55,7 @@ export default function WarehouseInventoryTable({
   warehouseId: Id<"warehouse">;
   organizationId: Id<"organizations">;
 }) {
-  const warehouses = useQuery(api.warehouse.getAvailableWarehose, {});
+  const warehouses = useQuery(api.warehouse.getAvailableWarehouse, {});
   const selectedWarehouse = warehouses?.find(
     (w) => w._id === warehouseId,
   );

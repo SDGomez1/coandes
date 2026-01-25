@@ -15,3 +15,10 @@ export const getOrg = query({
   },
 });
 
+export const list = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("organizations").collect();
+  },
+});
+

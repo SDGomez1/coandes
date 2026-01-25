@@ -24,7 +24,7 @@ export default function Page() {
   const organization = useQuery(api.organizations.getOrg);
   const orgId = organization?._id as Id<"organizations">;
 
-  const warehouses = useQuery(api.warehouse.getAvailableWarehose, {});
+  const warehouses = useQuery(api.warehouse.getAvailableWarehouse, {});
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<
     Id<"warehouse"> | undefined
   >(undefined);
