@@ -30,7 +30,7 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
       requireEmailVerification: false,
     },
     plugins: [
-      convex({ authConfig }),
+      convex({ authConfig, jwksRotateOnTokenGenerationError:true }),
       emailOTP({
         disableSignUp: true,
         async sendVerificationOTP({ email, otp, type }, ctx) {
