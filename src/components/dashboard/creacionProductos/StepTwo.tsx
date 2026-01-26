@@ -109,7 +109,7 @@ export default function StepTwo() {
       </div>
       <p className="font-light text-sm text-gray-ligth my-7 mx-auto">
         {equivalence ? equivalence : 1}{" "}
-        {currentPresentation ? currentPresentation : "Bulto"} = {averageWeight}{" "}
+        {currentPresentation ? currentPresentation : ""} = {averageWeight}{" "}
         {currentUnit.length > 0 ? currentUnit : "Kg"}
       </p>
     </>

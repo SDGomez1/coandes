@@ -10,17 +10,14 @@ export default function Home() {
         <div className="w-full h-full bg-black opacity-60 absolute"></div>
         <Image src={BGImage} alt="logo" className="w-full " />
       </div>
-      <div className="lg:w-1/2 flex flex-col py-11 px-6 lg:px-20 justify-center overflow-y-auto">
-        <Image src={Logo} alt="logo" className="h-auto w-56 my-14" />
+      <div className="lg:w-1/2 flex flex-col py-11 px-6 lg:px-20 justify-center overflow-y-auto items-center gap-4">
+        <Image src={Logo} alt="logo" className="h-auto w-96 my-14" />
         <h2 className="font-semibold text-black-ligth text-4xl mb-5">
           Plataforma de gestión{" "}
         </h2>
-        <p className="font-medium text-gray-ligth mb-16">
-          Inventarios, compras, bodega y despachos.
-        </p>
         <Link
           href={"/auth/login"}
-          className="w-full bg-primary text-center text-white py-3 rounded"
+          className="bg-primary text-center text-white py-3 rounded w-96"
         >
           Continuar al inicio de sesión
         </Link>

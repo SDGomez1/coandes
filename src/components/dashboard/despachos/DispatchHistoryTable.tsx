@@ -36,6 +36,7 @@ type DispatchHistoryRow = {
   dispatchDate: number;
   customerName: string;
   lotNumber: string;
+  lotNumberDispatch: string;
   productName: string;
   quantityDispatched: number;
   unit: string;
@@ -94,7 +95,7 @@ export default function DispatchHistoryTable() {
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            No. Lote
+            No. tiquete
             {column.getIsSorted() === "asc" ? (
               <ArrowUp className="ml-2 h-4 w-4" />
             ) : (
@@ -104,6 +105,23 @@ export default function DispatchHistoryTable() {
         ),
         cell: (info) => info.getValue(),
       }),
+      columnHelper.accessor("lotNumberDispatch", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            No. tiquete despacho
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => info.getValue(),
+      }),
+
       columnHelper.accessor("productName", {
         header: ({ column }) => (
           <Button
@@ -142,7 +160,7 @@ export default function DispatchHistoryTable() {
             convertFromCanonical(quantity, "kg"),
           );
 
-          return `${displayValue}`;
+          return <p className="w-1/2 text-right">{displayValue}</p>;
         },
       }),
     ],

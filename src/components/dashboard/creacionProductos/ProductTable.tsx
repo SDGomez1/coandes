@@ -35,7 +35,7 @@ function ProductCategorySection({
     <Accordion type="multiple" className="w-full">
       {products.map((prod) => (
         <AccordionItem key={prod._id} value={prod._id as string}>
-          <div className="flex items-center">
+          <div className="flex justify-between">
             <AccordionTrigger className="text-xs font-medium flex-1">
               {prod.name} | {prod.sku}
             </AccordionTrigger>

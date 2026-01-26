@@ -165,7 +165,7 @@ export default function PurchaseHistoryTable() {
             convertFromCanonical(quantity, "kg"),
           );
 
-          return `${displayValue}`;
+          return <p className="w-1/2 text-right ">{displayValue}</p>
         },
       }),
     ],

@@ -71,9 +71,9 @@ export default defineSchema({
 
   suppliers: defineTable({
     organizationId: v.id("organizations"),
- /**
- * Fetches products filtered by their type.
- */   name: v.string(),
+    /**
+     * Fetches products filtered by their type.
+     */ name: v.string(),
     details: v.optional(v.string()),
   }).index("by_org", ["organizationId"]),
   customers: defineTable({
@@ -144,6 +144,7 @@ export default defineSchema({
     dispatchId: v.id("dispatches"),
     inventoryLotId: v.id("inventoryLots"),
     quantityDispatched: v.number(),
+    ticketNumber: v.string(),
   }).index("by_dispatch", ["dispatchId"]),
 
   activityLog: defineTable({

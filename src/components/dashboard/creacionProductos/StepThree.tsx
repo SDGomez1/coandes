@@ -28,15 +28,15 @@ export default function StepThree() {
   return (
     <>
       <DialogTitle className="mt-7 font-semibold text-lg">
-        Parámetros de calidad
+        Factores de calidad
       </DialogTitle>
       <p className="text-gray-ligth mt-4">
-        Seleccione los factores existentes o añada parámetros personalizados.
+        Seleccione los factores existentes 
       </p>
 
       {/* Existing Quality Factors (from Convex) */}
       <div className="mt-6 space-y-3">
-        <h3 className="font-medium">Factores disponibles</h3>
+        <h3 className="font-medium">Factores de calidad disponibles</h3>
         <Accordion type="multiple" className="w-full">
           {categories === undefined ? (
             <div className="text-sm text-muted-foreground px-2 py-3">

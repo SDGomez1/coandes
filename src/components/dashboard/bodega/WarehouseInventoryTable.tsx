@@ -56,9 +56,7 @@ export default function WarehouseInventoryTable({
   organizationId: Id<"organizations">;
 }) {
   const warehouses = useQuery(api.warehouse.getAvailableWarehouse, {});
-  const selectedWarehouse = warehouses?.find(
-    (w) => w._id === warehouseId,
-  );
+  const selectedWarehouse = warehouses?.find((w) => w._id === warehouseId);
 
   const data = useQuery(
     api.inventory.getWarehouseInventory,
@@ -146,7 +144,9 @@ export default function WarehouseInventoryTable({
             quantity,
             selectedWarehouse?.baseUnit as WeightUnit,
           );
-          return <em>{`${formatNumber(displayValue)} ${selectedWarehouse?.baseUnit}`}</em>;
+          return (
+            <p className="w-1/2 text-right">{`${formatNumber(displayValue)} ${selectedWarehouse?.baseUnit}`}</p>
+          );
         },
       }),
       columnHelper.accessor("quantity", {
@@ -171,10 +171,12 @@ export default function WarehouseInventoryTable({
             quantity,
             "kg" as WeightUnit,
           );
-          return <em>{`${formatNumber(displayValue)} kg`}</em>;
+          return (
+            <p className="w-1/2  text-right">{`${formatNumber(displayValue)} `}</p>
+          );
         },
       }),
- /*     columnHelper.display({
+      /*     columnHelper.display({
         id: "actions",
         header: () => <span>Acciones</span>,
         cell: (info) => (
@@ -267,40 +269,37 @@ export default function WarehouseInventoryTable({
         />
       </div>
       <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id} className="bg-[#f9f9f9]">
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id} className="text-gray">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext(),
-                            )}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="bg-[#f9f9f9]">
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id} className="text-gray">
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
                         )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
+                  </TableHead>
                 ))}
-              </TableBody>
-            </Table>
-            <PaginationControls table={table} />
-          </div>
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        <PaginationControls table={table} />
+      </div>
     </div>
   );
 }

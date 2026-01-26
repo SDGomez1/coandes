@@ -133,7 +133,7 @@ export default function ProductionHistoryTable() {
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Cant. Consumida
+            Cant. Consumida (kg)
             {column.getIsSorted() === "asc" ? (
               <ArrowUp className="ml-2 h-4 w-4" />
             ) : (
@@ -146,9 +146,8 @@ export default function ProductionHistoryTable() {
           const displayValue = formatNumber(
             convertFromCanonical(value, unit as WeightUnit),
           );
-          return `${displayValue} ${unit}`;
-        },
-        sortingFn: "alphanumeric",
+          return <p className="w-2/3 text-right">{displayValue} </p>;
+        }
       }),
       columnHelper.accessor("outputProduct", {
         header: ({ column }) => (
@@ -172,7 +171,7 @@ export default function ProductionHistoryTable() {
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
-            Cant. Producida
+            Cant. Producida (kg)
             {column.getIsSorted() === "asc" ? (
               <ArrowUp className="ml-2 h-4 w-4" />
             ) : (
@@ -185,9 +184,8 @@ export default function ProductionHistoryTable() {
           const displayValue = formatNumber(
             convertFromCanonical(value, unit as WeightUnit),
           );
-          return `${displayValue} ${unit}`;
+          return <p className="w-2/3 text-right">{displayValue} </p>;
         },
-        sortingFn: "alphanumeric",
       }),
       columnHelper.accessor("newLotNumber", {
         header: ({ column }) => (

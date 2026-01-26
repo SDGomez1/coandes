@@ -71,11 +71,12 @@ export default function CreateDispatchFlow() {
 // ------------------- Form Component -------------------
 const formSchema = z.object({
   productId: z.string().min(1, "Debe seleccionar un producto."),
-  lotId: z.string().min(1, "Debe seleccionar un lote."),
+  lotId: z.string().min(1, "Debe seleccionar un tiquet."),
   quantityDispatched: z
     .number()
     .positive("La cantidad debe ser mayor que cero."),
   customerId: z.string().optional(),
+  ticketNumber: z.string().min(1, "Debe tener por lo menos una letra"),
 });
 type DispatchFormValues = z.infer<typeof formSchema>;
 function DispatchForm() {
@@ -101,6 +102,7 @@ function DispatchForm() {
       lotId: "",
       quantityDispatched: 0,
       customerId: "",
+            ticketNumber: ""
     },
   });
 
@@ -147,6 +149,7 @@ function DispatchForm() {
           {
             inventoryLotId: data.lotId as Id<"inventoryLots">,
             quantityDispatched: data.quantityDispatched,
+            ticketNumber: data.ticketNumber,
           },
         ],
       });
@@ -206,7 +209,7 @@ function DispatchForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>
-                      Lote <span className="text-destructive">*</span>
+                      No.Tiquete <span className="text-destructive">*</span>
                     </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
@@ -215,7 +218,7 @@ function DispatchForm() {
                             placeholder={
                               !availableLots
                                 ? "Cargando..."
-                                : "Seleccione un lote..."
+                                : "Seleccione un No. tiquete..."
                             }
                           />
                         </SelectTrigger>
@@ -250,10 +253,11 @@ function DispatchForm() {
                         Cantidad a Despachar{" "}
                         <span className="text-destructive">*</span>
                       </FormLabel>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 max-w-xs">
                         <FormControl>
                           <Input
                             type="number"
+                            placeholder="0"
                             step="any"
                             onChange={(e) =>
                               field.onChange(
@@ -276,6 +280,27 @@ function DispatchForm() {
                           />
                         </FormControl>
                         <span className="text-sm font-medium">kg</span>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="ticketNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        No.Tiquete despacho
+                        <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <div className="flex items-center gap-2 max-w-xs">
+                        <FormControl>
+                          <Input
+                            placeholder="No. Tiquete"
+                            {...field}
+                          />
+                        </FormControl>
                       </div>
                       <FormMessage />
                     </FormItem>

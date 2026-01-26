@@ -21,7 +21,8 @@ export const createDispatch = mutation({
       v.object({
         inventoryLotId: v.id("inventoryLots"),
         quantityDispatched: v.number(),
-      })
+        ticketNumber: v.string(),
+      }),
     ),
   },
   handler: async (ctx, args) => {
@@ -37,14 +38,16 @@ export const createDispatch = mutation({
     for (const item of args.items) {
       const lot = await ctx.db.get(item.inventoryLotId);
       if (!lot) {
-        throw new Error(`Inventory lot with ID ${item.inventoryLotId} not found.`);
+        throw new Error(
+          `Inventory lot with ID ${item.inventoryLotId} not found.`,
+        );
       }
       if (lot.organizationId !== args.organizationId) {
         throw new Error(`Access denied to lot ${lot.lotNumber}.`);
       }
       if (lot.quantity < item.quantityDispatched) {
         throw new Error(
-          `Insufficient quantity for lot ${lot.lotNumber}. Available: ${lot.quantity}, Required: ${item.quantityDispatched}`
+          `Insufficient quantity for lot ${lot.lotNumber}. Available: ${lot.quantity}, Required: ${item.quantityDispatched}`,
         );
       }
 
@@ -53,6 +56,7 @@ export const createDispatch = mutation({
         dispatchId: dispatchId,
         inventoryLotId: item.inventoryLotId,
         quantityDispatched: item.quantityDispatched,
+        ticketNumber: item.ticketNumber,
       });
 
       // Decrement the lot quantity
@@ -75,7 +79,6 @@ export const createDispatch = mutation({
   },
 });
 
-
 /**
  * Fetches all dispatches for a given organization.
  */
@@ -96,42 +99,47 @@ export const getDispatches = query({
  * Fetches a history of all dispatched items.
  */
 export const getDispatchHistory = query({
-    args: {
-        organizationId: v.id("organizations"),
-    },
-    handler: async (ctx, args) => {
-        // This is a bit more complex as we start from the line items.
-        // A more performant approach might involve denormalizing some data,
-        // but this is the most flexible for querying.
-        const allDispatches = await ctx.db.query("dispatches")
-            .withIndex("by_org", q => q.eq("organizationId", args.organizationId))
-            .order("desc")
-            .collect();
-        
-        const history = [];
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    // This is a bit more complex as we start from the line items.
+    // A more performant approach might involve denormalizing some data,
+    // but this is the most flexible for querying.
+    const allDispatches = await ctx.db
+      .query("dispatches")
+      .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
+      .order("desc")
+      .collect();
 
-        for (const dispatch of allDispatches) {
-            const lineItems = await ctx.db.query("dispatchLineItems")
-                .withIndex("by_dispatch", q => q.eq("dispatchId", dispatch._id))
-                .collect();
-            
-            const customer = dispatch.customerId ? await ctx.db.get(dispatch.customerId) : null;
+    const history = [];
 
-            for (const item of lineItems) {
-                const lot = await ctx.db.get(item.inventoryLotId);
-                const product = lot ? await ctx.db.get(lot.productId) : null;
+    for (const dispatch of allDispatches) {
+      const lineItems = await ctx.db
+        .query("dispatchLineItems")
+        .withIndex("by_dispatch", (q) => q.eq("dispatchId", dispatch._id))
+        .collect();
 
-                history.push({
-                    _id: item._id,
-                    dispatchDate: dispatch.dispatchDate,
-                    customerName: customer?.name ?? "N/A",
-                    lotNumber: lot?.lotNumber ?? "N/A",
-                    productName: product?.name ?? "Producto no encontrado",
-                    quantityDispatched: item.quantityDispatched,
-                    unit: product?.baseUnit ?? "N/A"
-                });
-            }
-        }
-        return history;
+      const customer = dispatch.customerId
+        ? await ctx.db.get(dispatch.customerId)
+        : null;
+
+      for (const item of lineItems) {
+        const lot = await ctx.db.get(item.inventoryLotId);
+        const product = lot ? await ctx.db.get(lot.productId) : null;
+
+        history.push({
+          _id: item._id,
+          dispatchDate: dispatch.dispatchDate,
+          customerName: customer?.name ?? "N/A",
+          lotNumber: lot?.lotNumber ?? "N/A",
+          lotNumberDispatch: item.ticketNumber,
+          productName: product?.name ?? "Producto no encontrado",
+          quantityDispatched: item.quantityDispatched,
+          unit: product?.baseUnit ?? "N/A",
+        });
+      }
     }
+    return history;
+  },
 });

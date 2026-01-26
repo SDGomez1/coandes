@@ -297,7 +297,7 @@ function PurchaseForm({
                         <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder={`# tiquete`} {...field} />
+                        <Input placeholder={`# tiquete`} {...field}  autoComplete="off"/>
                       </FormControl>
                     </FormItem>
                   )}
@@ -334,7 +334,7 @@ function PurchaseForm({
                         <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
-                        <Input placeholder="Placa" {...field} />
+                        <Input placeholder="Placa" {...field} autoComplete="off"/>
                       </FormControl>
                     </FormItem>
                   )}

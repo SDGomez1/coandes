@@ -123,7 +123,7 @@ export function Chart({ chartData }: { chartData: any[] | undefined }) {
           <span className="flex justify-center items-center rounded-full bg-[#F9F7F8] size-10">
             <ChartColumnBig className="h-5 w-5 text-muted-foreground" />
           </span>
-          Compras y despachados en los ultimos 5 días{" "}
+          Compras y despachos en los últimos 5 días{" "}
         </CardTitle>
       </CardHeader>
 

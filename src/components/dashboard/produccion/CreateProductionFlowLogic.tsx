@@ -73,7 +73,6 @@ export default function ProductionForm() {
     defaultValues: {
       inputProductId: "",
       inputLotId: "",
-      quantityConsumed: 0,
       outputs: [],
     },
   });
@@ -116,8 +115,8 @@ export default function ProductionForm() {
         append({
           productId: firstOutput._id,
           quantityProduced: 0,
-          lotNumber: `${selectedInputLot.lotNumber}_SP_${(fields.length + 1).toString().padStart(2, '0')}`,
-          warehouseId:  warehouses ?  warehouses[0]._id  : "",
+          lotNumber: `${selectedInputLot.lotNumber}_SP_${(fields.length + 1).toString().padStart(2, "0")}`,
+          warehouseId: warehouses ? warehouses[0]._id : "",
           qualityFactors: [],
         });
       }
@@ -270,8 +269,9 @@ export default function ProductionForm() {
                       <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center max-w-xs gap-2">
                         <Input
+                          placeholder="0"
                           type="number"
                           {...field}
                           onChange={(e) =>
@@ -403,7 +403,11 @@ function OutputCard({
                 <SelectContent>
                   {possibleOutputs.map((p: any) => (
                     <SelectItem key={p._id} value={p._id}>
-                      {p.name} ({p.type ==  "Finished Good" ? "Producto final" : "Sub-producto"})
+                      {p.name} (
+                      {p.type == "Finished Good"
+                        ? "Producto final"
+                        : "Sub-producto"}
+                      )
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -432,47 +436,46 @@ function OutputCard({
                 </FormItem>
               )}
             />
-
           </div>
 
-              <FormField
-                control={form.control}
-                name={`outputs.${index}.lotNumber`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>No. Tiquete</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name={`outputs.${index}.warehouseId`}
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bodega</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Bodega..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {warehouses.map((w: any) => (
-                          <SelectItem key={w._id} value={w._id}>
-                            {w.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )}
-              />
+          <FormField
+            control={form.control}
+            name={`outputs.${index}.lotNumber`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>No. Tiquete</FormLabel>
+                <FormControl>
+                  <Input {...field} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name={`outputs.${index}.warehouseId`}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Bodega</FormLabel>
+                <Select
+                  onValueChange={field.onChange}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Bodega..." />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {warehouses.map((w: any) => (
+                      <SelectItem key={w._id} value={w._id}>
+                        {w.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            )}
+          />
 
           {qualityFactors && qualityFactors.length > 0 && (
             <div className="md:col-span-3 space-y-2 pt-2 border-t mt-2">
