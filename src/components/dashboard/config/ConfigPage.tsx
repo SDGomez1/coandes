@@ -67,6 +67,7 @@ type User = {
 };
 
 export function ConfigPage({ userData }: { userData: any }) {
+  const org = useQuery(api.organizations.getOrg);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
@@ -74,7 +75,7 @@ export function ConfigPage({ userData }: { userData: any }) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const organizationUsers = useQuery(api.users.byOrganization, {
-    organizationId: userData.organizationId,
+    organizationId: org?._id as Id<"organizations">,
   });
 
   const updateUserName = useMutation(api.users.updateUserConfig);

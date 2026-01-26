@@ -5,7 +5,7 @@ import { fetchAuthQuery } from "@/lib/auth-server";
 import { Id } from "../../../../convex/betterAuth/_generated/dataModel";
 import { useQuery } from "convex/react";
 
-async function Config() {
+export function Config() {
   const userData = useQuery(api.auth.getAuthUser);
   if (!userData) {
     return <div>Loading...</div>;
