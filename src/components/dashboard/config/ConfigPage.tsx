@@ -2,13 +2,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useAuth } from "@clerk/nextjs";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,6 +22,16 @@ import {
 } from "@/components/ui/select";
 
 import { z } from "zod";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -39,25 +43,34 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useState } from "react";
-import { Id } from "convex/_generated/dataModel";
 
 const updateNameSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
+  name: z.string().min(2, "El nombre tiene que tener al menos 2 letras"),
 });
 
 const addUserSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email({message: "Pon un correo valido"}),
   role: z.enum(["admin", "user"]),
 });
 
 import { useDebounce } from "use-debounce";
 import { toast } from "sonner";
+import { Id as authId } from "../../../../convex/betterAuth/_generated/dataModel";
+import { Id } from "../../../../convex/_generated/dataModel";
+
+type User = {
+  userConfigId: Id<"userConfig">;
+  userId: authId<"user">;
+  name: string;
+  email: string;
+  role: string;
+};
 
 export function ConfigPage({
   userData,
 }: {
   userData: {
-    userId: Id<"user">;
+    userId: authId<"user">;
     organizationId: Id<"organizations">;
     role: string;
     name: string;
@@ -67,12 +80,14 @@ export function ConfigPage({
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const organizationUsers = useQuery(api.users.byOrganization, {
     organizationId: userData.organizationId,
   });
 
-  const updateUserName = useMutation(api.betterAuth.users.updateUserName);
+  const updateUserName = useMutation(api.users.updateUserConfig);
   const addUserToOrganization = useMutation(api.users.addUserToOrganization);
   const removeUserFromOrganization = useMutation(
     api.users.removeUserFromOrganization,
@@ -114,13 +129,21 @@ export function ConfigPage({
       });
   };
 
-  const handleRemoveUser = (userConfigId: Id<"userConfig">) => {
+  const handleDeleteClick = (user: any) => {
+    setUserToDelete(user);
+    setIsConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!userToDelete) return;
     removeUserFromOrganization({
-      userConfigId: userConfigId,
+      userConfigId: userToDelete.userConfigId,
       organizationId: userData.organizationId,
     })
       .then(() => {
         toast.success("Usuario eliminado correctamente");
+        setIsConfirmOpen(false);
+        setUserToDelete(null);
       })
       .catch(() => {
         toast.error("Error al eliminar usuario");
@@ -178,7 +201,7 @@ export function ConfigPage({
         </CardContent>
       </Card>
 
-      {userData.role === "admin" && (
+      {(userData.role === "admin" || userData.role === "superAdmin") && (
         <Card>
           <CardHeader>
             <CardTitle>Administrar Usuarios</CardTitle>
@@ -188,13 +211,13 @@ export function ConfigPage({
               <Form {...addUserForm}>
                 <form
                   onSubmit={addUserForm.handleSubmit(handleAddUser)}
-                  className="flex items-end space-x-4"
+                  className="flex flex-col gap-4 lg:flex-row lg:items-end "
                 >
                   <FormField
                     control={addUserForm.control}
                     name="email"
                     render={({ field }) => (
-                      <FormItem className="flex-grow">
+                      <FormItem className="grow">
                         <FormLabel>Correo Electrónico</FormLabel>
                         <FormControl>
                           <Input
@@ -221,7 +244,7 @@ export function ConfigPage({
                           defaultValue={field.value}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="min-w-40">
                               <SelectValue placeholder="Selecciona un rol" />
                             </SelectTrigger>
                           </FormControl>
@@ -266,7 +289,7 @@ export function ConfigPage({
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => handleRemoveUser(user.userConfigId)}
+                            onClick={() => handleDeleteClick(user)}
                             disabled={user.userId === userData.userId}
                           >
                             Eliminar
@@ -280,7 +303,27 @@ export function ConfigPage({
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará permanentemente al usuario{" "}
+              <strong>{userToDelete?.name}</strong> de la organización. No
+              podrás deshacer esta acción.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsConfirmOpen(false)}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete}>
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
-

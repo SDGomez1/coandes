@@ -39,14 +39,6 @@ export const addUser = mutation({
 export const updateUserName = mutation({
   args: { userId: v.id("user"), name: v.string() },
   handler: async (ctx, args) => {
-    const { auth } = authComponent.getAuth(ctx);
-    const session = await auth.get();
-    if (session?.state !== "active") {
-      throw new Error("Not authenticated");
-    }
-    if (session.user.id !== args.userId) {
-      throw new Error("Not authorized");
-    }
     await ctx.db.patch(args.userId, {
       name: args.name,
       updatedAt: +new Date(),

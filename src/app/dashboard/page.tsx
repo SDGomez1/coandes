@@ -16,6 +16,7 @@ import { Id } from "../../../convex/_generated/dataModel";
 const pieChartConfig = {
   value: {
     label: "Inventario",
+    color: "#FBBF24",
   },
   "Raw Material": {
     label: "Materia Prima",
@@ -31,6 +32,8 @@ const pieChartConfig = {
   },
 };
 
+const colors = ["#60A5FA", "#34d399", "#fbbf24"];
+
 const barChartConfig = {
   value: {
     label: "Compras",
@@ -44,6 +47,8 @@ const lineChartConfig = {
 };
 
 const formatCurrency = (value: number) => `$${value.toLocaleString()}`;
+
+const formatInKg = (value: number) => `${value.toFixed(2)} kg`;
 
 export default function Page() {
   const organization = useQuery(api.organizations.getOrg);
@@ -63,7 +68,7 @@ export default function Page() {
   );
   const purchasesVsDispatches = useQuery(
     api.purchases.getPurchasesVsDispatches,
-    orgId ? { organizationId: orgId } : "skip",
+    orgId ? { organizationId: orgId, days: 5 } : "skip",
   );
 
   return (
@@ -77,12 +82,18 @@ export default function Page() {
         <TrazabilityChart chartData={purchasesVsDispatches} />
         <CustomPieChart
           data={
-            inventoryByCategory?.map((item) => ({ ...item, fill: "#000" })) ??
-            []
+            inventoryByCategory?.map((item, index) => ({
+              ...item,
+              name:
+                pieChartConfig[item.name as keyof typeof pieChartConfig]
+                  ?.label || item.name,
+              fill: colors[index],
+            })) ?? []
           }
           chartConfig={pieChartConfig as ChartConfig}
           title="Inventario por Categoría"
           icon={<PieChart className="h-5 w-5 text-muted-foreground" />}
+          yFormatter={formatInKg}
         />
         <CustomBarChart
           data={topSuppliers ?? []}
@@ -93,18 +104,14 @@ export default function Page() {
           xAxisKey="name"
           yAxisLabel="Valor de Compra"
           xAxisLabel="Proveedor"
-          yFormatter={formatCurrency}
         />
         <CustomLineChart
           data={productionVolume ?? []}
           chartConfig={lineChartConfig}
-          title="Volumen de Producción"
+          title="Volumen de Producción Mensual"
           icon={<LineChart className="h-5 w-5 text-muted-foreground" />}
           dataKey="value"
           xAxisKey="name"
-          yAxisLabel="Cantidad Producida"
-          xAxisLabel="Mes"
-          yFormatter={formatCurrency}
         />
       </div>
     </>

@@ -37,8 +37,8 @@ import Link from "next/link";
 const outputSchema = z.object({
   productId: z.string().min(1),
   quantityProduced: z.number().nonnegative(),
-  lotNumber: z.string(),
-  warehouseId: z.string().optional(),
+  lotNumber: z.string().min(1, "El número de lote es obligatorio."),
+  warehouseId: z.string().min(1, "Debe seleccionar una bodega."),
   qualityFactors: z.array(
     z.object({
       factorId: z.string(),
@@ -65,7 +65,7 @@ export default function ProductionForm() {
     api.inventory.getProducibleStock,
     orgId ? { organizationId: orgId } : "skip",
   );
-  const warehouses = useQuery(api.warehouse.getAvailableWarehose);
+  const warehouses = useQuery(api.warehouse.getAvailableWarehouse);
   const createProductionRun = useMutation(api.production.createProductionRun);
 
   const form = useForm<ProductionFormValues>({
@@ -105,13 +105,18 @@ export default function ProductionForm() {
   );
 
   const handleAddOutput = () => {
+    if (!selectedInputLot) {
+      toast.error("Debe seleccionar un lote de entrada primero.");
+      return;
+    }
+
     if (possibleOutputs && possibleOutputs.length > 0) {
       const firstOutput = possibleOutputs[0];
       if (firstOutput) {
         append({
           productId: firstOutput._id,
           quantityProduced: 0,
-          lotNumber: `LOTE-${firstOutput.sku}-${Date.now()}`,
+          lotNumber: `${selectedInputLot.lotNumber}_SP_${(fields.length + 1).toString().padStart(2, '0')}`,
           warehouseId:  warehouses ?  warehouses[0]._id  : "",
           qualityFactors: [],
         });
@@ -398,7 +403,7 @@ function OutputCard({
                 <SelectContent>
                   {possibleOutputs.map((p: any) => (
                     <SelectItem key={p._id} value={p._id}>
-                      {p.name}
+                      {p.name} ({p.type ==  "Finished Good" ? "Producto final" : "Sub-producto"})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -416,7 +421,7 @@ function OutputCard({
               name={`outputs.${index}.quantityProduced`}
               render={({ field }) => (
                 <FormItem className="flex-grow">
-                  <FormLabel>Cant. Producida</FormLabel>
+                  <FormLabel>Cant. Producida (kg)</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -427,41 +432,15 @@ function OutputCard({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name={`outputs.${index}.unit`}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Unidad</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {WEIGHT_UNIT_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
+
           </div>
-          {outputProduct.type !== "By-product" && (
-            <>
+
               <FormField
                 control={form.control}
                 name={`outputs.${index}.lotNumber`}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nuevo Lote</FormLabel>
+                    <FormLabel>No. Tiquete</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>
@@ -494,8 +473,7 @@ function OutputCard({
                   </FormItem>
                 )}
               />
-            </>
-          )}
+
           {qualityFactors && qualityFactors.length > 0 && (
             <div className="md:col-span-3 space-y-2 pt-2 border-t mt-2">
               <h5 className="font-semibold">Factores de Calidad</h5>

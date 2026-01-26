@@ -174,7 +174,7 @@ export default function WarehouseInventoryTable({
           return <em>{`${formatNumber(displayValue)} kg`}</em>;
         },
       }),
-      columnHelper.display({
+ /*     columnHelper.display({
         id: "actions",
         header: () => <span>Acciones</span>,
         cell: (info) => (
@@ -186,7 +186,7 @@ export default function WarehouseInventoryTable({
             Ver
           </Button>
         ),
-      }),
+      }),*/
     ],
     [router],
   );

@@ -103,14 +103,23 @@ export default function Page() {
               <span>
                 Actual:{" "}
                 <span className="font-semibold">
-                  {formatNumber(convertFromCanonical(currentAmount, unit))}{" "}
-                  {unit}
+                  {formatNumber(convertFromCanonical(currentAmount, "kg"))}{" "}
+                  kg{" "}
+                </span>
+                <span className="font-semibold">
+                  ({formatNumber(convertFromCanonical(currentAmount, unit))}{" "}
+                  {unit})
                 </span>
               </span>
               <span>
                 Capacidad:{" "}
                 <span className="font-semibold">
-                  {formatNumber(convertFromCanonical(maxCapacity, unit))} {unit}
+                  {formatNumber(convertFromCanonical(maxCapacity, "kg"))}{" "}
+                  kg{" "}
+                </span>
+                <span className="font-semibold">
+                  ({formatNumber(convertFromCanonical(maxCapacity, unit))}{" "}
+                  {unit})
                 </span>
               </span>
             </div>

@@ -19,18 +19,17 @@ import {
   ChartContainer,
   ChartTooltip,
 } from "@/components/ui/chart";
+import { convertFromCanonical, convertToCanonical } from "@/lib/units";
+import { formatNumber } from "@/lib/utils";
 
 export const description = "Two-line area chart with real Date objects";
 
-
-
 const chartConfig = {
-  ganado: { label: "Ganado", color: "var(--chart-1)" },
-  costo: { label: "Costo", color: "var(--chart-2)" },
+  despachos: { label: "Despachos", color: "var(--chart-1)" },
+  compras: { label: "Compras", color: "var(--chart-2)" },
 } satisfies ChartConfig;
 
-const formatCurrencyCO = (n: number) =>
-  `$ ${Intl.NumberFormat("es-CO").format(n)}`;
+const formatInKg = (n: number) => `${(n / 1000).toFixed(2)} kg`;
 
 const capitalizeFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -82,10 +81,6 @@ function CustomTooltip(props: any) {
         <div className="text-xs text-muted-foreground">{header}</div>
       ) : null}
 
-      <div className="text-lg font-semibold leading-none">
-        {formatCurrencyCO(total)}
-      </div>
-
       <div className="grid gap-1">
         {payload.map((p: any) => {
           const key = String(p.dataKey ?? p.name);
@@ -110,7 +105,7 @@ function CustomTooltip(props: any) {
                 <span className="text-sm text-muted-foreground">{label}</span>
               </div>
               <span className="text-sm font-medium tabular-nums">
-                {formatCurrencyCO(value)}
+                {`${formatNumber(convertFromCanonical(value, "kg"))} kg`}
               </span>
             </div>
           );
@@ -120,7 +115,7 @@ function CustomTooltip(props: any) {
   );
 }
 
-export function Chart({ chartData }: { chartData: any[] | undefined}) {
+export function Chart({ chartData }: { chartData: any[] | undefined }) {
   return (
     <Card className="w-full">
       <CardHeader>
@@ -128,7 +123,7 @@ export function Chart({ chartData }: { chartData: any[] | undefined}) {
           <span className="flex justify-center items-center rounded-full bg-[#F9F7F8] size-10">
             <ChartColumnBig className="h-5 w-5 text-muted-foreground" />
           </span>
-          Trazabilidad General
+          Compras y despachados en los ultimos 5 días{" "}
         </CardTitle>
       </CardHeader>
 
@@ -167,7 +162,10 @@ export function Chart({ chartData }: { chartData: any[] | undefined}) {
             <YAxis
               tickLine={false}
               axisLine={false}
-              tickFormatter={(value) => `$${(value / 1_000_000).toFixed(0)}M`}
+              width={80}
+              tickFormatter={(value) =>
+                `${convertFromCanonical(value, "kg").toFixed(0)} kg`
+              }
             />
 
             <ChartTooltip
@@ -175,23 +173,23 @@ export function Chart({ chartData }: { chartData: any[] | undefined}) {
               content={<CustomTooltip />}
             />
 
-            {/* Ganado (green line) */}
+            {/* Despachos (green line) */}
             <Area
-              dataKey="ganado"
+              dataKey="despachos"
               type="monotone"
-              fill="var(--color-ganado, #22c55e)"
+              fill="var(--color-despachos, #22c55e)"
               fillOpacity={0.25}
-              stroke="var(--color-ganado, #22c55e)"
+              stroke="var(--color-despachos, #22c55e)"
               strokeWidth={2}
             />
 
-            {/* Costo (blue line) */}
+            {/* Compras (blue line) */}
             <Area
-              dataKey="costo"
+              dataKey="compras"
               type="monotone"
-              fill="var(--color-costo, #3b82f6)"
+              fill="var(--color-compras, #3b82f6)"
               fillOpacity={0.25}
-              stroke="var(--color-costo, #3b82f6)"
+              stroke="var(--color-compras, #3b82f6)"
               strokeWidth={2}
             />
           </AreaChart>

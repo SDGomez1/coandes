@@ -152,74 +152,128 @@ export const getPurchaseHistory = query({
 });
 
 export const getTopSuppliersByPurchase = query({
-    args: {
-        organizationId: v.id("organizations"),
-    },
-    handler: async (ctx, args) => {
-        const purchases = await ctx.db
-            .query("inventoryLots")
-            .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
-            .filter((q) => q.eq(q.field("source.type"), "purchase"))
-            .collect();
-        const suppliers = new Map<string, {name: string, value: number}>();
-        for(const purchase of purchases) {
-            if (purchase.source.type === "purchase") {
-                const p = await ctx.db.get(purchase.source.purchaseId);
-                if (p?.supplierId) {
-                    const supplier = await ctx.db.get(p.supplierId);
-                    if (supplier) {
-                        const currentQuantity = suppliers.get(supplier._id)?.value ?? 0;
-                        suppliers.set(supplier._id, { name: supplier.name, value: currentQuantity + purchase.quantity });
-                    }
-                }
-            }
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    const purchases = await ctx.db
+      .query("inventoryLots")
+      .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
+      .filter((q) => q.eq(q.field("source.type"), "purchase"))
+      .collect();
+    const suppliers = new Map<string, { name: string; value: number }>();
+    for (const purchase of purchases) {
+      if (purchase.source.type === "purchase") {
+        const p = await ctx.db.get(purchase.source.purchaseId);
+        if (p?.supplierId) {
+          const supplier = await ctx.db.get(p.supplierId);
+          if (supplier) {
+            const currentQuantity = suppliers.get(supplier._id)?.value ?? 0;
+            suppliers.set(supplier._id, {
+              name: supplier.name,
+              value: currentQuantity + purchase.quantity,
+            });
+          }
         }
-
-        return Array.from(suppliers.values())
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 5);
+      }
     }
+
+    return Array.from(suppliers.values())
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5);
+  },
 });
 
 export const getPurchasesVsDispatches = query({
-    args: {
-        organizationId: v.id("organizations"),
-    },
-    handler: async (ctx, args) => {
-        const purchases = await ctx.db
-            .query("inventoryLots")
-            .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
-            .filter((q) => q.eq(q.field("source.type"), "purchase"))
-            .collect();
-        const dispatches = await ctx.db
-            .query("dispatchLineItems")
-            .collect();
+  args: {
+    organizationId: v.id("organizations"),
+    days: v.number(), // The timeframe parameter (e.g., 7, 30, 90)
+  },
+  handler: async (ctx, args) => {
+    // 1. Calculate the start date based on the parameter
+    const now = new Date();
+    const startDate = new Date();
+    startDate.setDate(now.getDate() - args.days);
+    // Normalize to start of that day (00:00:00)
+    startDate.setHours(0, 0, 0, 0);
+    const startDateMs = startDate.getTime();
 
-        const data = new Map<string, {ganado: number, costo: number}>();
+    // 2. Fetch purchases within range
+    const purchases = await ctx.db
+      .query("inventoryLots")
+      .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("source.type"), "purchase"),
+          q.gte(q.field("creationDate"), startDateMs),
+        ),
+      )
+      .collect();
 
-        for(const purchase of purchases) {
-            const date = new Date(purchase.creationDate);
-            const key = `${date.getFullYear()}-${date.getMonth()}`;
-            const current = data.get(key) ?? { ganado: 0, costo: 0 };
-            data.set(key, { ...current, costo: current.costo + purchase.quantity });
-        }
+    // 3. Fetch dispatches within range
+    const orgDispatches = await ctx.db
+      .query("dispatches")
+      .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
+      .filter((q) => q.gte(q.field("dispatchDate"), startDateMs))
+      .collect();
 
-        for(const dispatch of dispatches) {
-            const d = await ctx.db.get(dispatch.dispatchId);
-            if(d?.organizationId === args.organizationId) {
-                const date = new Date(d.dispatchDate);
-                const key = `${date.getFullYear()}-${date.getMonth()}`;
-                const current = data.get(key) ?? { ganado: 0, costo: 0 };
-                data.set(key, { ...current, ganado: current.ganado + dispatch.quantityDispatched });
-            }
-        }
-        
-        return Array.from(data.entries()).map(([date, values]) => {
-            const [year, month] = date.split('-');
-            return {
-                date: new Date(Number(year), Number(month)).getTime(),
-                ...values
-            }
-        });
+    // 4. Optimized Line Item Fetching (Concurrent)
+    const dispatchesWithItems = await Promise.all(
+      orgDispatches.map(async (dispatch) => {
+        const items = await ctx.db
+          .query("dispatchLineItems")
+          .withIndex("by_dispatch", (q) => q.eq("dispatchId", dispatch._id))
+          .collect();
+        return { ...dispatch, items };
+      }),
+    );
+
+    // 5. Initialize the Map for the specified range (Oldest -> Newest)
+    const data = new Map<string, { despachos: number; compras: number }>();
+    for (let i = 0; i <= args.days; i++) {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + i);
+      const key = d.toISOString().split("T")[0];
+      data.set(key, { despachos: 0, compras: 0 });
     }
+
+    // 6. Aggregate Purchase quantities
+    for (const purchase of purchases) {
+      const key = new Date(purchase.creationDate).toISOString().split("T")[0];
+      const current = data.get(key);
+      if (current) {
+        data.set(key, {
+          ...current,
+          compras: current.compras + purchase.quantity,
+        });
+      }
+    }
+
+    // 7. Aggregate Dispatch quantities
+    for (const dispatch of dispatchesWithItems) {
+      const key = new Date(dispatch.dispatchDate).toISOString().split("T")[0];
+      const dailyTotal = dispatch.items.reduce(
+        (sum, item) => sum + item.quantityDispatched,
+        0,
+      );
+      const current = data.get(key);
+      if (current) {
+        data.set(key, {
+          ...current,
+          despachos: current.despachos + dailyTotal,
+        });
+      }
+    }
+
+    // 8. Convert to array and ensure chronological order
+    // Since the Map was built starting from startDate, it is already mostly ordered,
+    // but we use localeCompare for final safety.
+    return Array.from(data.entries())
+      .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+      .map(([date, values]) => ({
+        date: new Date(date).getTime(),
+        humanDate: date, // Helpful for debugging/tooltips
+        ...values,
+      }));
+  },
 });

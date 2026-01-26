@@ -160,7 +160,6 @@ export default function AdminDashboard() {
                         <SelectContent>
                           <SelectItem value="user">User</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="superAdmin">Super Admin</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

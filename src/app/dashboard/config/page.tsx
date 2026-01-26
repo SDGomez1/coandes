@@ -1,7 +1,7 @@
 import { ConfigPage } from "@/components/dashboard/config/ConfigPage";
 import { api } from "../../../../convex/_generated/api";
-import { Id } from "../../../../convex/_generated/dataModel";
 import { fetchAuthQuery } from "@/lib/auth-server";
+import { Id } from "../../../../convex/betterAuth/_generated/dataModel";
 
 async function Config() {
   const userData = await fetchAuthQuery(api.user.getUserData);

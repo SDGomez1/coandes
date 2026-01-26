@@ -12,7 +12,7 @@ import EditWarehouse from "./EditWarehouse";
 import { convertFromCanonical } from "@/lib/units";
 
 export default function WarehouseTable() {
-  const wareHouseData = useQuery(api.warehouse.getAvailableWarehose);
+  const wareHouseData = useQuery(api.warehouse.getAvailableWarehouse);
 
   if (!wareHouseData || wareHouseData.length <= 0) {
     return (

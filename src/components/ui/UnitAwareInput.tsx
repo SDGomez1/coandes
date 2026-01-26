@@ -22,67 +22,34 @@ interface UnitAwareInputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
   valueInCanonicalUnit: number;
   onChange: (newCanonicalValue: number) => void;
-  preferredDisplayUnit?: WeightUnit;
 }
 
 export const UnitAwareInput = ({
   valueInCanonicalUnit,
   onChange,
-  preferredDisplayUnit,
   className,
   ...rest
 }: UnitAwareInputProps) => {
   const [displayValue, setDisplayValue] = useState<string>("");
-  const [selectedUnit, setSelectedUnit] = useState<WeightUnit>(
-    preferredDisplayUnit ?? WEIGHT_UNITS.KG,
-  );
 
   useEffect(() => {
-    let targetUnit = preferredDisplayUnit ?? selectedUnit;
-
-    if (!preferredDisplayUnit) {
-      if (valueInCanonicalUnit >= WEIGHT_CONVERSIONS.ton) {
-        targetUnit = WEIGHT_UNITS.TON;
-      } else if (valueInCanonicalUnit >= WEIGHT_CONVERSIONS.kg) {
-        targetUnit = WEIGHT_UNITS.KG;
-      } else {
-        targetUnit = WEIGHT_UNITS.G;
-      }
-    }
-
     const valueForDisplay = convertFromCanonical(
       valueInCanonicalUnit,
-      targetUnit,
+      WEIGHT_UNITS.KG,
     );
 
     // Avoid displaying long decimals from conversion artifacts
     const roundedValue = parseFloat(valueForDisplay.toPrecision(10));
 
     setDisplayValue(String(roundedValue));
-    setSelectedUnit(targetUnit);
-  }, [valueInCanonicalUnit, preferredDisplayUnit]);
+  }, [valueInCanonicalUnit]);
 
   const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDisplayValue = e.target.value;
     setDisplayValue(newDisplayValue);
     const numericValue = parseFloat(newDisplayValue);
     if (!isNaN(numericValue)) {
-      const newCanonicalValue = convertToCanonical(numericValue, selectedUnit);
-      onChange(newCanonicalValue);
-    } else {
-      onChange(0);
-    }
-  };
-
-  const handleUnitChange = (newUnit: WeightUnit) => {
-    const currentNumericValue = parseFloat(displayValue);
-    setSelectedUnit(newUnit);
-
-    if (!isNaN(currentNumericValue)) {
-      const newCanonicalValue = convertToCanonical(
-        currentNumericValue,
-        newUnit,
-      );
+      const newCanonicalValue = convertToCanonical(numericValue, WEIGHT_UNITS.KG);
       onChange(newCanonicalValue);
     } else {
       onChange(0);
@@ -99,18 +66,7 @@ export const UnitAwareInput = ({
         step="any"
         {...rest}
       />
-      <Select value={selectedUnit} onValueChange={handleUnitChange}>
-        <SelectTrigger className="w-[100px]">
-          <SelectValue placeholder="Unit" />
-        </SelectTrigger>
-        <SelectContent>
-          {WEIGHT_UNIT_OPTIONS.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <span>kg</span>
     </div>
   );
 };

@@ -34,11 +34,11 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
         disableSignUp: true,
         async sendVerificationOTP({ email, otp, type }, ctx) {
           if (type === "sign-in") {
-            const subject = "Your sign-in code";
-            const html = `<p>Your code is <b>${otp}</b>. It expires in 10 minutes.</p>`;
+            const subject = "Tu código de inicio de sesión";
+            const html = `<p>Tu código es <b>${otp}</b>. Expira en 10 minutos.</p>`;
 
             const resend = new Resend(process.env.RESEND_API_KEY);
-            const fromEmail = "auth@sdgomez.com";
+            const fromEmail = "Gestión Coandes <auth@sdgomez.com>";
             const res = await resend.emails.send({
               from: fromEmail,
               to: email,
@@ -68,15 +68,5 @@ export const rotateKeys = internalAction({
   handler: async (ctx) => {
     const auth = createAuth(ctx);
     return auth.api.getLatestJwks();
-  },
-});
-
-// Example functions, feel free to edit, omit, etc.
-
-// Get the current user
-export const getCurrentUser = query({
-  args: {},
-  handler: async (ctx) => {
-    return authComponent.safeGetAuthUser(ctx);
   },
 });

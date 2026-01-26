@@ -15,7 +15,6 @@ export default function AdminPage() {
       </div>
     );
   }
-  console.log(userConfig);
 
   if (userConfig === null || userConfig.role !== "superAdmin") {
     redirect("/dashboard");
