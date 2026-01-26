@@ -24,6 +24,7 @@ export const createAuthOptions = (ctx: GenericCtx<DataModel>) => {
   return {
     baseURL: siteUrl,
     database: authComponent.adapter(ctx),
+    trustedOrigins: ["www.grupocoandes.com"],
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false,
