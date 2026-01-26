@@ -1,11 +1,12 @@
+"use client";
 import { ConfigPage } from "@/components/dashboard/config/ConfigPage";
 import { api } from "../../../../convex/_generated/api";
 import { fetchAuthQuery } from "@/lib/auth-server";
 import { Id } from "../../../../convex/betterAuth/_generated/dataModel";
+import { useQuery } from "convex/react";
 
 async function Config() {
-  const userData = await fetchAuthQuery(api.user.getUserData);
-
+  const userData = useQuery(api.auth.getAuthUser);
   if (!userData) {
     return <div>Loading...</div>;
   }

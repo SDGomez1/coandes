@@ -49,7 +49,7 @@ const updateNameSchema = z.object({
 });
 
 const addUserSchema = z.object({
-  email: z.string().email({message: "Pon un correo valido"}),
+  email: z.string().email({ message: "Pon un correo valido" }),
   role: z.enum(["admin", "user"]),
 });
 
@@ -66,17 +66,7 @@ type User = {
   role: string;
 };
 
-export function ConfigPage({
-  userData,
-}: {
-  userData: {
-    userId: authId<"user">;
-    organizationId: Id<"organizations">;
-    role: string;
-    name: string;
-    email: string;
-  };
-}) {
+export function ConfigPage({ userData }: { userData: any }) {
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
