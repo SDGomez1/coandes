@@ -68,9 +68,9 @@ type User = {
 
 export function ConfigPage({ userData }: { userData: any }) {
   const org = useQuery(api.organizations.getOrg);
+  const config = useQuery(api.userConfig.getCurrentUserConfig);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
@@ -192,7 +192,7 @@ export function ConfigPage({ userData }: { userData: any }) {
         </CardContent>
       </Card>
 
-      {(userData.role === "admin" || userData.role === "superAdmin") && (
+      {(config?.role === "admin" || config?.role === "superAdmin") && (
         <Card>
           <CardHeader>
             <CardTitle>Administrar Usuarios</CardTitle>
