@@ -12,6 +12,8 @@ import {
   BaggageClaim,
   BadgeCheck,
 } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 export const mainLinks = [
   {
     title: "Dashboard",
@@ -65,6 +67,7 @@ export const creationLinks = [
 ];
 
 export default function SideNavLinks() {
+  const userConfig = useQuery(api.userConfig.getCurrentUserConfig);
   return (
     <>
       <div className={`flex flex-col gap-3`}>
@@ -77,17 +80,22 @@ export default function SideNavLinks() {
           />
         ))}
       </div>
-      <Separator />
-      <div className={`flex flex-col gap-3`}>
-        {creationLinks.map((data) => (
-          <SideNavLink
-            title={data.title}
-            route={data.route}
-            key={data.route}
-            icon={data.icon}
-          />
+      {userConfig?.role == "admin" ||
+        (userConfig?.role == "superAdmin" && (
+          <>
+            <Separator />
+            <div className={`flex flex-col gap-3`}>
+              {creationLinks.map((data) => (
+                <SideNavLink
+                  title={data.title}
+                  route={data.route}
+                  key={data.route}
+                  icon={data.icon}
+                />
+              ))}
+            </div>{" "}
+          </>
         ))}
-      </div>
     </>
   );
 }
