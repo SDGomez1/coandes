@@ -129,7 +129,7 @@ export function ConfigPage({ userData }: { userData: any }) {
     if (!userToDelete) return;
     removeUserFromOrganization({
       userConfigId: userToDelete.userConfigId,
-      organizationId: userData.organizationId,
+      organizationId: org?._id as Id<"organizations">,
     })
       .then(() => {
         toast.success("Usuario eliminado correctamente");
