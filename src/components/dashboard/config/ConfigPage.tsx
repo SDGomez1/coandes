@@ -108,7 +108,7 @@ export function ConfigPage({ userData }: { userData: any }) {
   const handleAddUser = (values: z.infer<typeof addUserSchema>) => {
     addUserToOrganization({
       email: values.email,
-      organizationId: userData.organizationId,
+      organizationId: org?._id as Id<"organizations">,
       role: values.role,
     })
       .then(() => {
