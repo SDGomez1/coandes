@@ -68,6 +68,9 @@ export const creationLinks = [
 
 export default function SideNavLinks() {
   const userConfig = useQuery(api.userConfig.getCurrentUserConfig);
+
+  console.log(userConfig?.role == "admin");
+  console.log(userConfig?.role);
   return (
     <>
       <div className={`flex flex-col gap-3`}>
@@ -80,22 +83,21 @@ export default function SideNavLinks() {
           />
         ))}
       </div>
-      {userConfig?.role == "admin" ||
-        (userConfig?.role == "superAdmin" && (
-          <>
-            <Separator />
-            <div className={`flex flex-col gap-3`}>
-              {creationLinks.map((data) => (
-                <SideNavLink
-                  title={data.title}
-                  route={data.route}
-                  key={data.route}
-                  icon={data.icon}
-                />
-              ))}
-            </div>{" "}
-          </>
-        ))}
+      {(userConfig?.role == "admin" || userConfig?.role == "superAdmin") && (
+        <>
+          <Separator />
+          <div className={`flex flex-col gap-3`}>
+            {creationLinks.map((data) => (
+              <SideNavLink
+                title={data.title}
+                route={data.route}
+                key={data.route}
+                icon={data.icon}
+              />
+            ))}
+          </div>{" "}
+        </>
+      )}
     </>
   );
 }
