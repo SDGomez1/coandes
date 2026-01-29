@@ -69,8 +69,6 @@ export const creationLinks = [
 export default function SideNavLinks() {
   const userConfig = useQuery(api.userConfig.getCurrentUserConfig);
 
-  console.log(userConfig?.role == "admin");
-  console.log(userConfig?.role);
   return (
     <>
       <div className={`flex flex-col gap-3`}>
