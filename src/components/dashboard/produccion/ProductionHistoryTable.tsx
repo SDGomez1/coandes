@@ -19,6 +19,7 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   SortingState,
+  type Table as TanStackTable,
   useReactTable,
 } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
@@ -443,8 +444,6 @@ export default function ProductionHistoryTable() {
     getPaginationRowModel: getPaginationRowModel(),
   });
 
-  const activeTable = viewMode === "entries" ? entryTable : outputTable;
-
   if (historyData === undefined || warehouses === undefined) {
     return (
       <div className="w-full mt-8 p-6 flex justify-center items-center border rounded-lg shadow-sm">
@@ -499,38 +498,49 @@ export default function ProductionHistoryTable() {
           className="max-w-lg"
         />
       </div>
-      <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">
-        <Table>
-          <TableHeader>
-            {activeTable.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="bg-[#f9f9f9]">
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="text-gray">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {activeTable.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <PaginationControls table={activeTable} />
-      </div>
+      {viewMode === "entries" ? (
+        <ProductionHistoryDataTable table={entryTable} />
+      ) : (
+        <ProductionHistoryDataTable table={outputTable} />
+      )}
+    </div>
+  );
+}
+
+function ProductionHistoryDataTable<TData>({
+  table,
+}: {
+  table: TanStackTable<TData>;
+}) {
+  return (
+    <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">
+      <Table>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id} className="bg-[#f9f9f9]">
+              {headerGroup.headers.map((header) => (
+                <TableHead key={header.id} className="text-gray">
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.map((row) => (
+            <TableRow key={row.id}>
+              {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <PaginationControls table={table} />
     </div>
   );
 }

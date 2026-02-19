@@ -41,7 +41,8 @@ const formSchema = z.object({
   notes: z.string().optional(),
 });
 
-type ProductionEntryFormValues = z.infer<typeof formSchema>;
+type ProductionEntryFormValues = z.input<typeof formSchema>;
+type ProductionEntrySubmitValues = z.output<typeof formSchema>;
 
 export default function ProductionEntryForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,7 +55,7 @@ export default function ProductionEntryForm() {
   );
   const createProductionRun = useMutation(api.production.createProductionRun);
 
-  const form = useForm<ProductionEntryFormValues>({
+  const form = useForm<ProductionEntryFormValues, unknown, ProductionEntrySubmitValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       inputProductId: "",
@@ -78,7 +79,7 @@ export default function ProductionEntryForm() {
   const inputLotId = useWatch({ control: form.control, name: "inputLotId" });
   const selectedInputLot = availableLots?.find((lot) => lot._id === inputLotId);
 
-  const onSubmit = async (data: ProductionEntryFormValues) => {
+  const onSubmit = async (data: ProductionEntrySubmitValues) => {
     if (!selectedInputLot || data.quantityConsumed > selectedInputLot.quantity) {
       form.setError("quantityConsumed", {
         type: "manual",
