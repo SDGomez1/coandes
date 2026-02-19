@@ -102,6 +102,96 @@ export const receivePurchase = mutation({
   },
 });
 
+export const editPurchaseEntry = mutation({
+  args: {
+    inventoryLotId: v.id("inventoryLots"),
+    warehouseId: v.id("warehouse"),
+    lotNumber: v.string(),
+    quantity: v.number(),
+    vehicleInfo: v.string(),
+    supplierId: v.optional(v.id("suppliers")),
+  },
+  handler: async (ctx, args) => {
+    if (args.quantity <= 0) {
+      throw new Error("Quantity must be greater than zero.");
+    }
+    if (!args.lotNumber.trim()) {
+      throw new Error("Lot number is required.");
+    }
+    if (!args.vehicleInfo.trim()) {
+      throw new Error("Vehicle info is required.");
+    }
+
+    const lot = await ctx.db.get(args.inventoryLotId);
+    if (!lot) {
+      throw new Error("Inventory lot not found.");
+    }
+    if (lot.source.type !== "purchase") {
+      throw new Error("Only purchase lots can be edited from this flow.");
+    }
+
+    const purchase = await ctx.db.get(lot.source.purchaseId);
+    if (!purchase) {
+      throw new Error("Purchase not found.");
+    }
+
+    const targetWarehouse = await ctx.db.get(args.warehouseId);
+    if (!targetWarehouse) {
+      throw new Error("Warehouse not found.");
+    }
+    if (targetWarehouse.organizationId !== lot.organizationId) {
+      throw new Error("Warehouse does not belong to this organization.");
+    }
+
+    const duplicateLot = await ctx.db
+      .query("inventoryLots")
+      .withIndex("by_org", (q) => q.eq("organizationId", lot.organizationId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("lotNumber"), args.lotNumber),
+          q.neq(q.field("_id"), args.inventoryLotId),
+        ),
+      )
+      .first();
+
+    if (duplicateLot) {
+      throw new Error(`Lot number ${args.lotNumber} already exists.`);
+    }
+
+    const usedCapacity = await getUsedWarehouseCapacity(
+      ctx,
+      args.warehouseId,
+      args.inventoryLotId,
+    );
+    if (usedCapacity + args.quantity > targetWarehouse.capacity) {
+      throw new Error("Insufficient warehouse capacity for the edited lot.");
+    }
+
+    await ctx.db.patch(args.inventoryLotId, {
+      warehouseId: args.warehouseId,
+      lotNumber: args.lotNumber,
+      quantity: args.quantity,
+      vehicleInfo: args.vehicleInfo,
+    });
+
+    await ctx.db.patch(purchase._id, {
+      supplierId: args.supplierId,
+    });
+
+    const quantityDelta = args.quantity - lot.quantity;
+    if (quantityDelta !== 0) {
+      await ctx.db.insert("activityLog", {
+        organizationId: lot.organizationId,
+        inventoryLotId: lot._id,
+        activityType: "adjustment",
+        quantityChange: quantityDelta,
+        relatedId: purchase._id,
+        timestamp: Date.now(),
+      });
+    }
+  },
+});
+
 /**
  * Fetches a history of all purchase lots.
  * This query denormalizes data from multiple tables to create a flat structure for the UI table.
@@ -120,21 +210,26 @@ export const getPurchaseHistory = query({
 
     const history = await Promise.all(
       purchaseLots.map(async (lot) => {
+        if (lot.source.type !== "purchase") {
+          return null;
+        }
+
         const product = await ctx.db.get(lot.productId);
         const warehouse = await ctx.db.get(lot.warehouseId);
+        const purchase = await ctx.db.get(lot.source.purchaseId);
 
         let supplierName = "N/A";
-        // The source is always "purchase" because of the filter above, but we check to satisfy TypeScript
-        if (lot.source.type === "purchase") {
-          const purchase = await ctx.db.get(lot.source.purchaseId);
-          if (purchase?.supplierId) {
-            const supplier = await ctx.db.get(purchase.supplierId);
-            supplierName = supplier?.name ?? "N/A";
-          }
+        if (purchase?.supplierId) {
+          const supplier = await ctx.db.get(purchase.supplierId);
+          supplierName = supplier?.name ?? "N/A";
         }
 
         return {
           _id: lot._id,
+          purchaseId: lot.source.purchaseId,
+          productId: lot.productId,
+          warehouseId: lot.warehouseId,
+          supplierId: purchase?.supplierId,
           lotNumber: lot.lotNumber,
           productName: product?.name ?? "Producto no encontrado",
           supplierName: supplierName,
@@ -142,14 +237,34 @@ export const getPurchaseHistory = query({
           warehouseName: warehouse?.name ?? "Bodega no encontrada",
           quantity: lot.quantity,
           unit: product?.baseUnit ?? "N/A",
+          presentation: product?.presentation ?? "",
+          equivalence: product?.equivalence ?? "",
+          averageWeight: product?.averageWeight ?? 0,
           vehicleInfo: lot.vehicleInfo,
         };
       }),
     );
 
-    return history;
+    return history.filter((item) => item !== null);
   },
 });
+
+async function getUsedWarehouseCapacity(
+  ctx: any,
+  warehouseId: any,
+  excludeLotId: any,
+) {
+  const lots = await ctx.db
+    .query("inventoryLots")
+    .withIndex("by_warehouse", (q: any) => q.eq("warehouseId", warehouseId))
+    .filter((q: any) => q.gt(q.field("quantity"), 0))
+    .collect();
+
+  return lots.reduce((sum: number, current: any) => {
+    if (current._id === excludeLotId) return sum;
+    return sum + current.quantity;
+  }, 0);
+}
 
 export const getTopSuppliersByPurchase = query({
   args: {

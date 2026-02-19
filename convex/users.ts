@@ -92,6 +92,21 @@ export const addUserToOrganization = mutation({
   },
 });
 
+export const userExistsByEmail = mutation({
+  args: {
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existingUser = await ctx.runQuery(
+      components.betterAuth.users.getUserByEmail,
+      {
+        email: args.email,
+      },
+    );
+    return Boolean(existingUser);
+  },
+});
+
 export const updateUserConfig = mutation({
   args: {
     userId: v.string(),

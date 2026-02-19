@@ -113,7 +113,7 @@ export default function EditQualityCategory({
   });
 
   const onInvalid = (errors: any) => {
-    let message = `Error al editar la categoría. ${errors.factors?.root?.message ?? ""}`;
+    const message = `Error al editar la categoría. ${errors.factors?.root?.message ?? ""}`;
     toast.error(message);
   };
 

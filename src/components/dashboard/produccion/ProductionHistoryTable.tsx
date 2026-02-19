@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 import {
@@ -23,23 +23,43 @@ import {
 } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
-import { convertFromCanonical, WeightUnit } from "@/lib/units";
+import { convertFromCanonical, convertToCanonical, WeightUnit } from "@/lib/units";
 import { Button } from "@/components/ui/button";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, SquarePen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PaginationControls } from "../bodega/PaginationControls";
 import { formatNumber } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type ProductionHistoryRow = {
   _id: Id<"productionRuns">;
+  inputLotId: Id<"inventoryLots">;
   runDate: number;
   inputProductName: string;
   inputLotNumber: string;
   quantityConsumed: number;
   inputUnit: string;
   outputs: {
+    _id: Id<"productionOutputs">;
+    productId: Id<"products">;
     productName: string;
     quantityProduced: number;
+    resultingInventoryLotId?: Id<"inventoryLots">;
+    warehouseId?: Id<"warehouse">;
     newLotNumber: string;
     unit: string;
     qualityFactors: { name: string; value: string }[];
@@ -48,8 +68,13 @@ type ProductionHistoryRow = {
 
 type FlatProductionHistoryRow = {
   runId: Id<"productionRuns">;
+  inputLotId: Id<"inventoryLots">;
+  productionOutputId: Id<"productionOutputs">;
+  outputLotId?: Id<"inventoryLots">;
+  outputWarehouseId?: Id<"warehouse">;
   runDate: number;
-  inputProduct: string;
+  inputProductName: string;
+  inputLotNumber: string;
   quantityConsumed: { value: number; unit: string };
   outputProduct: string;
   quantityProduced: { value: number; unit: string };
@@ -57,7 +82,17 @@ type FlatProductionHistoryRow = {
   qualityFactors: { name: string; value: string }[];
 };
 
-const columnHelper = createColumnHelper<FlatProductionHistoryRow>();
+type ProductionEntryRow = {
+  runId: Id<"productionRuns">;
+  runDate: number;
+  inputProductName: string;
+  inputLotNumber: string;
+  quantityConsumed: { value: number; unit: string };
+  outputsCount: number;
+};
+
+const outputColumnHelper = createColumnHelper<FlatProductionHistoryRow>();
+const entryColumnHelper = createColumnHelper<ProductionEntryRow>();
 
 export default function ProductionHistoryTable() {
   const organization = useQuery(api.organizations.getOrg);
@@ -67,14 +102,20 @@ export default function ProductionHistoryTable() {
     api.production.getProductionHistory,
     orgId ? { organizationId: orgId } : "skip",
   );
+  const warehouses = useQuery(api.warehouse.getAvailableWarehouse);
 
-  const data = useMemo(() => {
+  const outputData = useMemo(() => {
     if (!historyData) return [];
-    return historyData.flatMap((run) =>
+    return historyData.flatMap((run: ProductionHistoryRow) =>
       run.outputs.map((output) => ({
         runId: run._id,
+        inputLotId: run.inputLotId,
+        productionOutputId: output._id,
+        outputLotId: output.resultingInventoryLotId,
+        outputWarehouseId: output.warehouseId,
         runDate: run.runDate,
-        inputProduct: `${run.inputProductName} (Lote: ${run.inputLotNumber})`,
+        inputProductName: run.inputProductName,
+        inputLotNumber: run.inputLotNumber,
         quantityConsumed: {
           value: run.quantityConsumed,
           unit: run.inputUnit,
@@ -90,12 +131,29 @@ export default function ProductionHistoryTable() {
     );
   }, [historyData]);
 
-  const [globalFilter, setGlobalFilter] = useState("");
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const entryData = useMemo(() => {
+    if (!historyData) return [];
+    return historyData.map((run: ProductionHistoryRow) => ({
+      runId: run._id,
+      runDate: run.runDate,
+      inputProductName: run.inputProductName,
+      inputLotNumber: run.inputLotNumber,
+      quantityConsumed: {
+        value: run.quantityConsumed,
+        unit: run.inputUnit,
+      },
+      outputsCount: run.outputs.length,
+    }));
+  }, [historyData]);
 
-  const columns = useMemo(
+  const [viewMode, setViewMode] = useState<"entries" | "outputs">("entries");
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [entrySorting, setEntrySorting] = useState<SortingState>([]);
+  const [outputSorting, setOutputSorting] = useState<SortingState>([]);
+
+  const outputColumns = useMemo(
     () => [
-      columnHelper.accessor("runDate", {
+      outputColumnHelper.accessor("runDate", {
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -111,7 +169,7 @@ export default function ProductionHistoryTable() {
         ),
         cell: (info) => new Date(info.getValue()).toLocaleDateString(),
       }),
-      columnHelper.accessor("inputProduct", {
+      outputColumnHelper.accessor("inputProductName", {
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -127,7 +185,23 @@ export default function ProductionHistoryTable() {
         ),
         cell: (info) => info.getValue(),
       }),
-      columnHelper.accessor("quantityConsumed", {
+      outputColumnHelper.accessor("inputLotNumber", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Lote Entrada
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => info.getValue(),
+      }),
+      outputColumnHelper.accessor("quantityConsumed", {
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -141,15 +215,20 @@ export default function ProductionHistoryTable() {
             )}
           </Button>
         ),
+        sortingFn: (rowA, rowB, columnId) => {
+          const a = rowA.getValue<{ value: number }>(columnId).value;
+          const b = rowB.getValue<{ value: number }>(columnId).value;
+          return a - b;
+        },
         cell: (info) => {
           const { value, unit } = info.getValue();
           const displayValue = formatNumber(
             convertFromCanonical(value, unit as WeightUnit),
           );
-          return <p className="w-2/3 text-right">{displayValue} </p>;
-        }
+          return <p className="w-full text-right tabular-nums">{displayValue}</p>;
+        },
       }),
-      columnHelper.accessor("outputProduct", {
+      outputColumnHelper.accessor("outputProduct", {
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -165,7 +244,7 @@ export default function ProductionHistoryTable() {
         ),
         cell: (info) => info.getValue(),
       }),
-      columnHelper.accessor("quantityProduced", {
+      outputColumnHelper.accessor("quantityProduced", {
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -179,15 +258,20 @@ export default function ProductionHistoryTable() {
             )}
           </Button>
         ),
+        sortingFn: (rowA, rowB, columnId) => {
+          const a = rowA.getValue<{ value: number }>(columnId).value;
+          const b = rowB.getValue<{ value: number }>(columnId).value;
+          return a - b;
+        },
         cell: (info) => {
           const { value, unit } = info.getValue();
           const displayValue = formatNumber(
             convertFromCanonical(value, unit as WeightUnit),
           );
-          return <p className="w-2/3 text-right">{displayValue} </p>;
+          return <p className="w-full text-right tabular-nums">{displayValue}</p>;
         },
       }),
-      columnHelper.accessor("newLotNumber", {
+      outputColumnHelper.accessor("newLotNumber", {
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -203,7 +287,7 @@ export default function ProductionHistoryTable() {
         ),
         cell: (info) => info.getValue(),
       }),
-      columnHelper.accessor("qualityFactors", {
+      outputColumnHelper.accessor("qualityFactors", {
         header: "Factores de Calidad",
         cell: (info) => {
           const factors = info.getValue();
@@ -218,18 +302,125 @@ export default function ProductionHistoryTable() {
         },
         enableSorting: false,
       }),
+      outputColumnHelper.display({
+        id: "actions",
+        header: "Acciones",
+        cell: ({ row }) => (
+          <EditProductionEntryDialog
+            entry={row.original}
+            warehouses={warehouses ?? []}
+          />
+        ),
+      }),
+    ],
+    [warehouses],
+  );
+
+  const entryColumns = useMemo(
+    () => [
+      entryColumnHelper.accessor("runDate", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Fecha
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => new Date(info.getValue()).toLocaleDateString(),
+      }),
+      entryColumnHelper.accessor("inputProductName", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Entrada
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => info.getValue(),
+      }),
+      entryColumnHelper.accessor("inputLotNumber", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Lote Entrada
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => info.getValue(),
+      }),
+      entryColumnHelper.accessor("quantityConsumed", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Cant. Consumida (kg)
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        sortingFn: (rowA, rowB, columnId) => {
+          const a = rowA.getValue<{ value: number }>(columnId).value;
+          const b = rowB.getValue<{ value: number }>(columnId).value;
+          return a - b;
+        },
+        cell: (info) => {
+          const { value, unit } = info.getValue();
+          const displayValue = formatNumber(
+            convertFromCanonical(value, unit as WeightUnit),
+          );
+          return <p className="w-full text-right tabular-nums">{displayValue}</p>;
+        },
+      }),
+      entryColumnHelper.accessor("outputsCount", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            No. Salidas
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => <p className="w-full text-right tabular-nums">{info.getValue()}</p>,
+      }),
     ],
     [],
   );
 
-  const table = useReactTable({
-    data,
-    columns,
+  const entryTable = useReactTable({
+    data: entryData,
+    columns: entryColumns,
     state: {
-      sorting,
+      sorting: entrySorting,
       globalFilter,
     },
-    onSortingChange: setSorting,
+    onSortingChange: setEntrySorting,
     getSortedRowModel: getSortedRowModel(),
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
@@ -237,7 +428,24 @@ export default function ProductionHistoryTable() {
     getPaginationRowModel: getPaginationRowModel(),
   });
 
-  if (historyData === undefined) {
+  const outputTable = useReactTable({
+    data: outputData,
+    columns: outputColumns,
+    state: {
+      sorting: outputSorting,
+      globalFilter,
+    },
+    onSortingChange: setOutputSorting,
+    getSortedRowModel: getSortedRowModel(),
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  const activeTable = viewMode === "entries" ? entryTable : outputTable;
+
+  if (historyData === undefined || warehouses === undefined) {
     return (
       <div className="w-full mt-8 p-6 flex justify-center items-center border rounded-lg shadow-sm">
         <LoadingSpinner />
@@ -245,7 +453,7 @@ export default function ProductionHistoryTable() {
     );
   }
 
-  if (data.length === 0) {
+  if (entryData.length === 0 && outputData.length === 0) {
     return (
       <div className="mt-8 flow-root">
         <div className="flex items-center justify-between">
@@ -264,9 +472,28 @@ export default function ProductionHistoryTable() {
 
   return (
     <div className="mt-8 flow-root">
+      <div className="flex flex-wrap gap-2 mb-4">
+        <Button
+          variant={viewMode === "entries" ? "default" : "outline"}
+          onClick={() => setViewMode("entries")}
+        >
+          Entradas
+        </Button>
+        <Button
+          variant={viewMode === "outputs" ? "default" : "outline"}
+          onClick={() => setViewMode("outputs")}
+        >
+          Salidas
+        </Button>
+      </div>
+
       <div className="flex items-center justify-between mb-4">
         <Input
-          placeholder="Buscar en la producción..."
+          placeholder={
+            viewMode === "entries"
+              ? "Buscar en entradas de producción..."
+              : "Buscar en salidas de producción..."
+          }
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
@@ -275,7 +502,7 @@ export default function ProductionHistoryTable() {
       <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
+            {activeTable.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="bg-[#f9f9f9]">
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id} className="text-gray">
@@ -291,7 +518,7 @@ export default function ProductionHistoryTable() {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.map((row) => (
+            {activeTable.getRowModel().rows.map((row) => (
               <TableRow key={row.id}>
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>
@@ -302,8 +529,131 @@ export default function ProductionHistoryTable() {
             ))}
           </TableBody>
         </Table>
-        <PaginationControls table={table} />
+        <PaginationControls table={activeTable} />
       </div>
     </div>
+  );
+}
+
+function EditProductionEntryDialog({
+  entry,
+  warehouses,
+}: {
+  entry: FlatProductionHistoryRow;
+  warehouses: Array<{ _id: Id<"warehouse">; name: string }>;
+}) {
+  const editProductionOutputEntry = useMutation(
+    api.production.editProductionOutputEntry,
+  );
+
+  const [open, setOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lotNumber, setLotNumber] = useState(entry.newLotNumber);
+  const [warehouseId, setWarehouseId] = useState<string>(entry.outputWarehouseId ?? "");
+  const [quantityProducedKg, setQuantityProducedKg] = useState<string>(
+    String(convertFromCanonical(entry.quantityProduced.value, "kg")),
+  );
+  const [quantityConsumedKg, setQuantityConsumedKg] = useState<string>(
+    String(convertFromCanonical(entry.quantityConsumed.value, "kg")),
+  );
+
+  const handleSave = async () => {
+    if (!entry.outputLotId || !warehouseId) {
+      toast.error("No se pudo identificar el lote de salida para editar.");
+      return;
+    }
+
+    const parsedProduced = Number(quantityProducedKg);
+    const parsedConsumed = Number(quantityConsumedKg);
+    if (!Number.isFinite(parsedProduced) || parsedProduced <= 0) {
+      toast.error("La cantidad producida debe ser mayor que cero.");
+      return;
+    }
+    if (!Number.isFinite(parsedConsumed) || parsedConsumed <= 0) {
+      toast.error("La cantidad consumida debe ser mayor que cero.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await editProductionOutputEntry({
+        productionRunId: entry.runId,
+        productionOutputId: entry.productionOutputId,
+        quantityConsumed: convertToCanonical(parsedConsumed, "kg"),
+        quantityProduced: convertToCanonical(parsedProduced, "kg"),
+        lotNumber,
+        warehouseId: warehouseId as Id<"warehouse">,
+      });
+      toast.success("Producción actualizada correctamente.");
+      setOpen(false);
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo actualizar la producción.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <SquarePen className="size-4 text-primary" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Editar Producción</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm mb-2">Cant. Consumida (kg)</p>
+            <Input
+              type="number"
+              inputMode="decimal"
+              step="any"
+              value={quantityConsumedKg}
+              onChange={(e) => setQuantityConsumedKg(e.target.value)}
+            />
+          </div>
+          <div>
+            <p className="text-sm mb-2">Cant. Producida (kg)</p>
+            <Input
+              type="number"
+              inputMode="decimal"
+              step="any"
+              value={quantityProducedKg}
+              onChange={(e) => setQuantityProducedKg(e.target.value)}
+            />
+          </div>
+          <div>
+            <p className="text-sm mb-2">Nuevo Lote</p>
+            <Input value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} />
+          </div>
+          <div>
+            <p className="text-sm mb-2">Bodega salida</p>
+            <Select value={warehouseId} onValueChange={setWarehouseId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccione bodega" />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses.map((warehouse) => (
+                  <SelectItem key={warehouse._id} value={warehouse._id}>
+                    {warehouse.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? "Guardando..." : "Guardar"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -49,8 +49,9 @@ export function PaginationControls<T>({ table }: { table: Table<T> }) {
     return result;
   };
 
-  const start = totalRows === 0 ? 0 : pageIndex * pageSize + 1;
-  const end = Math.min(start + pageSize - 1, totalRows);
+  const isShowingAll = totalRows > 0 && pageSize >= totalRows;
+  const start = totalRows === 0 ? 0 : isShowingAll ? 1 : pageIndex * pageSize + 1;
+  const end = totalRows === 0 ? 0 : isShowingAll ? totalRows : Math.min(start + pageSize - 1, totalRows);
 
   return (
     <div className="flex items-center justify-between p-4 flex-col gap-4 lg:flex-row"> 
@@ -111,25 +112,32 @@ export function PaginationControls<T>({ table }: { table: Table<T> }) {
           </Button>
         </div>
 
-        <Select
-          value={String(pageSize)}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Mostrar por página</span>
+          <Select
+          value={isShowingAll ? "all" : String(pageSize)}
           onValueChange={(value) => {
+            if (value === "all") {
+              table.setPageIndex(0);
+              table.setPageSize(Math.max(totalRows, 1));
+              return;
+            }
             table.setPageSize(Number(value));
           }}
-        >
-          <SelectTrigger className="w-[130px]">
-            <SelectValue
-              placeholder="Selecione"
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {[5, 10, 20, 30, 40, 50].map((size) => (
-              <SelectItem key={size} value={String(size)}>
-                {size} / página
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          >
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="Seleccione" />
+            </SelectTrigger>
+            <SelectContent>
+              {[5, 10, 20, 30, 40, 50].map((size) => (
+                <SelectItem key={size} value={String(size)}>
+                  {size}
+                </SelectItem>
+              ))}
+              <SelectItem value="all">Todos</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </div>
   );

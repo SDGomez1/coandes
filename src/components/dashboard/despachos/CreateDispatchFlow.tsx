@@ -1,6 +1,6 @@
 "use client";
+
 import { useState } from "react";
-import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,14 +28,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
-import { UnitAwareInput } from "@/components/ui/UnitAwareInput";
-import {
-  convertToCanonical,
-  WeightUnit,
-  convertFromCanonical,
-} from "@/lib/units";
+import { convertToCanonical, convertFromCanonical } from "@/lib/units";
 
-// ------------------- Main Component -------------------
 export default function CreateDispatchFlow() {
   const [isCreating, setIsCreating] = useState(false);
   return (
@@ -68,17 +62,21 @@ export default function CreateDispatchFlow() {
   );
 }
 
-// ------------------- Form Component -------------------
 const formSchema = z.object({
   productId: z.string().min(1, "Debe seleccionar un producto."),
   lotId: z.string().min(1, "Debe seleccionar un tiquet."),
   quantityDispatched: z
     .number()
     .positive("La cantidad debe ser mayor que cero."),
-  customerId: z.string().optional(),
+  customerName: z
+    .string()
+    .trim()
+    .min(1, "Debe ingresar el nombre del cliente."),
   ticketNumber: z.string().min(1, "Debe tener por lo menos una letra"),
 });
+
 type DispatchFormValues = z.infer<typeof formSchema>;
+
 function DispatchForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const organization = useQuery(api.organizations.getOrg);
@@ -94,6 +92,7 @@ function DispatchForm() {
   );
 
   const createDispatch = useMutation(api.dispatches.createDispatch);
+  const createCustomer = useMutation(api.customers.createCustomer);
 
   const form = useForm<DispatchFormValues>({
     resolver: zodResolver(formSchema),
@@ -101,8 +100,8 @@ function DispatchForm() {
       productId: "",
       lotId: "",
       quantityDispatched: 0,
-      customerId: "",
-            ticketNumber: ""
+      customerName: "",
+      ticketNumber: "",
     },
   });
 
@@ -128,22 +127,30 @@ function DispatchForm() {
     if (!selectedLot || data.quantityDispatched > selectedLot.quantity) {
       form.setError("quantityDispatched", {
         type: "manual",
-        message: `La cantidad no puede ser mayor que la disponible (${
-          selectedLot
-            ? convertFromCanonical(selectedLot.quantity, "kg").toFixed(2)
-            : 0
-        } kg).`,
+        message: `La cantidad no puede ser mayor que la disponible (${(
+          selectedLot ? convertFromCanonical(selectedLot.quantity, "kg") : 0
+        ).toFixed(2)} kg).`,
       });
       return;
     }
 
     setIsSubmitting(true);
     try {
+      const normalizedName = data.customerName.trim().toLowerCase();
+      const existingCustomer = (customers ?? []).find(
+        (c) => c.name.trim().toLowerCase() === normalizedName,
+      );
+
+      const customerId = existingCustomer
+        ? existingCustomer._id
+        : await createCustomer({
+            organizationId: orgId!,
+            name: data.customerName.trim(),
+          });
+
       await createDispatch({
         organizationId: orgId!,
-        customerId: data.customerId
-          ? (data.customerId as Id<"customers">)
-          : undefined,
+        customerId,
         dispatchDate: Date.now(),
         items: [
           {
@@ -153,6 +160,7 @@ function DispatchForm() {
           },
         ],
       });
+
       toast.success("Despacho creado.");
       form.reset();
     } catch (error) {
@@ -226,11 +234,7 @@ function DispatchForm() {
                       <SelectContent>
                         {(availableLots ?? []).map((lot) => (
                           <SelectItem key={lot._id} value={lot._id}>
-                            {lot.lotNumber} (Disp:{" "}
-                            {convertFromCanonical(lot.quantity, "kg").toFixed(
-                              2,
-                            )}{" "}
-                            kg)
+                            {lot.lotNumber} (Disp: {convertFromCanonical(lot.quantity, "kg").toFixed(2)} kg)
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -250,8 +254,7 @@ function DispatchForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Cantidad a Despachar{" "}
-                        <span className="text-destructive">*</span>
+                        Cantidad a Despachar <span className="text-destructive">*</span>
                       </FormLabel>
                       <div className="flex items-center gap-2 max-w-xs">
                         <FormControl>
@@ -261,19 +264,13 @@ function DispatchForm() {
                             step="any"
                             onChange={(e) =>
                               field.onChange(
-                                convertToCanonical(
-                                  Number(e.target.value),
-                                  "kg",
-                                ),
+                                convertToCanonical(Number(e.target.value), "kg"),
                               )
                             }
                             value={
                               field.value
                                 ? parseFloat(
-                                    convertFromCanonical(
-                                      field.value,
-                                      "kg",
-                                    ).toPrecision(10),
+                                    convertFromCanonical(field.value, "kg").toPrecision(10),
                                   )
                                 : ""
                             }
@@ -285,56 +282,38 @@ function DispatchForm() {
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
                   name="ticketNumber"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        No.Tiquete despacho
-                        <span className="text-destructive">*</span>
+                        No.Tiquete despacho <span className="text-destructive">*</span>
                       </FormLabel>
-                      <div className="flex items-center gap-2 max-w-xs">
-                        <FormControl>
-                          <Input
-                            placeholder="No. Tiquete"
-                            {...field}
-                          />
-                        </FormControl>
-                      </div>
+                      <FormControl>
+                        <Input placeholder="No. Tiquete" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {/*
                 <FormField
                   control={form.control}
-                  name="customerId"
+                  name="customerName"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cliente (Opcional)</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccione un cliente..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {customers.map((c) => (
-                            <SelectItem key={c._id} value={c._id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>
+                        Nombre del Cliente <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="Nombre del cliente" {...field} />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
-                */}
               </div>
               <Button
                 type="submit"

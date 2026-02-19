@@ -21,6 +21,7 @@ export default function BreadCrumb() {
       ...mainLinks,
       ...creationLinks,
       { title: "Configuración", route: "/dashboard/config" },
+      { title: "Tipos de Producto", route: "/dashboard/tipos-producto" },
     ];
     return links.find((l) => l.route == path);
   }, [path]);

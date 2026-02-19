@@ -80,6 +80,9 @@ export const getWarehouseInventory = query({
           productType: product?.type ?? "Tipo desconocido",
           supplierName: supplierName,
           quantity: lot.quantity,
+          presentation: product?.presentation ?? "",
+          equivalence: product?.equivalence ?? "",
+          averageWeight: product?.averageWeight ?? 0,
         };
       }),
     );
@@ -165,5 +168,44 @@ export const getInventoryByCategory = query({
       name,
       value,
     }));
+  },
+});
+
+/**
+ * Fetches unified movement history for all inventory stages.
+ * Results are sorted by timestamp descending (newest first).
+ */
+export const getMovementHistory = query({
+  args: {
+    organizationId: v.id("organizations"),
+  },
+  handler: async (ctx, args) => {
+    const activity = await ctx.db
+      .query("activityLog")
+      .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
+      .collect();
+
+    const enriched = await Promise.all(
+      activity.map(async (entry) => {
+        const lot = await ctx.db.get(entry.inventoryLotId);
+        const product = lot ? await ctx.db.get(lot.productId) : null;
+        const warehouse = lot ? await ctx.db.get(lot.warehouseId) : null;
+
+        return {
+          _id: entry._id,
+          activityType: entry.activityType,
+          quantityChange: entry.quantityChange,
+          timestamp: entry.timestamp,
+          relatedId: entry.relatedId,
+          lotId: entry.inventoryLotId,
+          lotNumber: lot?.lotNumber ?? "N/A",
+          productName: product?.name ?? "Producto no encontrado",
+          warehouseName: warehouse?.name ?? "Bodega no encontrada",
+          unit: product?.baseUnit ?? "kg",
+        };
+      }),
+    );
+
+    return enriched.sort((a, b) => b.timestamp - a.timestamp);
   },
 });

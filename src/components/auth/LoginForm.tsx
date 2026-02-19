@@ -13,12 +13,15 @@ import { toast } from "sonner";
 import { setUserEmail } from "@/store/features/userData/userDataSlice";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 
 export default function LoginForm() {
-  const { data } = authClient.useSession();
+  authClient.useSession();
   const dispatch = useAppDispatch();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const userExistsByEmail = useMutation(api.users.userExistsByEmail);
   const formSchema = z.object({
     email: z.string().email(),
   });
@@ -34,6 +37,14 @@ export default function LoginForm() {
         onSubmit={form.handleSubmit(async (data) => {
           setIsLoading(true);
           try {
+            const exists = await userExistsByEmail({
+              email: data.email,
+            });
+            if (!exists) {
+              toast.error("El usuario no existe");
+              setIsLoading(false);
+              return;
+            }
             dispatch(setUserEmail(data.email));
             await authClient.emailOtp.sendVerificationOtp({
               email: data.email,

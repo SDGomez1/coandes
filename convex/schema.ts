@@ -47,6 +47,51 @@ export default defineSchema({
     qualityFactorsId: v.array(v.id("qualityFactors")),
   }).index("by_org", ["organizationId"]),
 
+  // Legacy table kept compatible to avoid breaking existing documents.
+  productTypes: defineTable({
+    organizationId: v.id("organizations"),
+    name: v.string(),
+    sku: v.optional(v.string()),
+    type: v.optional(
+      v.union(
+        v.literal("Raw Material"),
+        v.literal("Finished Good"),
+        v.literal("By-product"),
+      ),
+    ),
+    baseUnit: v.optional(
+      v.union(
+        v.literal("g"),
+        v.literal("kg"),
+        v.literal("ton"),
+        v.literal("lb"),
+        v.literal("oz"),
+      ),
+    ),
+    presentation: v.optional(v.string()),
+    equivalence: v.optional(v.string()),
+    averageWeigth: v.optional(v.union(v.number(), v.string())),
+    averageWeight: v.optional(v.number()),
+    qualityFactorsId: v.optional(v.array(v.id("qualityFactors"))),
+    baseType: v.optional(
+      v.union(
+        v.literal("Raw Material"),
+        v.literal("Finished Good"),
+        v.literal("By-product"),
+      ),
+    ),
+  }).index("by_org", ["organizationId"]),
+
+  managedProductTypes: defineTable({
+    organizationId: v.id("organizations"),
+    name: v.string(),
+    baseType: v.union(
+      v.literal("Raw Material"),
+      v.literal("Finished Good"),
+      v.literal("By-product"),
+    ),
+  }).index("by_org", ["organizationId"]),
+
   productOutputDefinitions: defineTable({
     organizationId: v.id("organizations"),
     inputProductId: v.id("products"),

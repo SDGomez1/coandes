@@ -15,6 +15,7 @@ import type * as email from "../email.js";
 import type * as http from "../http.js";
 import type * as inventory from "../inventory.js";
 import type * as organizations from "../organizations.js";
+import type * as productTypes from "../productTypes.js";
 import type * as production from "../production.js";
 import type * as products from "../products.js";
 import type * as purchases from "../purchases.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   inventory: typeof inventory;
   organizations: typeof organizations;
+  productTypes: typeof productTypes;
   production: typeof production;
   products: typeof products;
   purchases: typeof purchases;

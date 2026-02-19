@@ -79,6 +79,72 @@ export const createDispatch = mutation({
   },
 });
 
+export const editDispatchEntry = mutation({
+  args: {
+    dispatchLineItemId: v.id("dispatchLineItems"),
+    quantityDispatched: v.number(),
+    ticketNumber: v.string(),
+    customerId: v.optional(v.id("customers")),
+    dispatchDate: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    if (args.quantityDispatched <= 0) {
+      throw new Error("Quantity must be greater than zero.");
+    }
+    if (!args.ticketNumber.trim()) {
+      throw new Error("Dispatch ticket number is required.");
+    }
+
+    const lineItem = await ctx.db.get(args.dispatchLineItemId);
+    if (!lineItem) {
+      throw new Error("Dispatch line item not found.");
+    }
+
+    const dispatch = await ctx.db.get(lineItem.dispatchId);
+    if (!dispatch) {
+      throw new Error("Dispatch not found.");
+    }
+
+    const lot = await ctx.db.get(lineItem.inventoryLotId);
+    if (!lot) {
+      throw new Error("Inventory lot not found.");
+    }
+
+    const availableBeforeDispatch = lot.quantity + lineItem.quantityDispatched;
+    if (args.quantityDispatched > availableBeforeDispatch) {
+      throw new Error(
+        `Insufficient quantity for lot ${lot.lotNumber}. Available: ${availableBeforeDispatch}, Required: ${args.quantityDispatched}`,
+      );
+    }
+
+    await ctx.db.patch(lineItem._id, {
+      quantityDispatched: args.quantityDispatched,
+      ticketNumber: args.ticketNumber,
+    });
+
+    await ctx.db.patch(lot._id, {
+      quantity: availableBeforeDispatch - args.quantityDispatched,
+    });
+
+    await ctx.db.patch(dispatch._id, {
+      customerId: args.customerId,
+      dispatchDate: args.dispatchDate ?? dispatch.dispatchDate,
+    });
+
+    const quantityDelta = lineItem.quantityDispatched - args.quantityDispatched;
+    if (quantityDelta !== 0) {
+      await ctx.db.insert("activityLog", {
+        organizationId: dispatch.organizationId,
+        inventoryLotId: lot._id,
+        activityType: "adjustment",
+        quantityChange: quantityDelta,
+        relatedId: dispatch._id,
+        timestamp: Date.now(),
+      });
+    }
+  },
+});
+
 /**
  * Fetches all dispatches for a given organization.
  */
@@ -130,6 +196,9 @@ export const getDispatchHistory = query({
 
         history.push({
           _id: item._id,
+          dispatchId: dispatch._id,
+          inventoryLotId: item.inventoryLotId,
+          customerId: dispatch.customerId,
           dispatchDate: dispatch.dispatchDate,
           customerName: customer?.name ?? "N/A",
           lotNumber: lot?.lotNumber ?? "N/A",
@@ -137,6 +206,9 @@ export const getDispatchHistory = query({
           productName: product?.name ?? "Producto no encontrado",
           quantityDispatched: item.quantityDispatched,
           unit: product?.baseUnit ?? "N/A",
+          presentation: product?.presentation ?? "",
+          equivalence: product?.equivalence ?? "",
+          averageWeight: product?.averageWeight ?? 0,
         });
       }
     }

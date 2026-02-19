@@ -11,6 +11,8 @@ import {
   Factory,
   BaggageClaim,
   BadgeCheck,
+  Tags,
+  History,
 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -40,6 +42,11 @@ export const mainLinks = [
     route: "/dashboard/despachos",
     icon: Truck,
   },
+  {
+    title: "Movimientos",
+    route: "/dashboard/historial-movimientos",
+    icon: History,
+  },
 ];
 
 export const creationLinks = [
@@ -53,6 +60,11 @@ export const creationLinks = [
     title: "Gestión de Productos",
     route: "/dashboard/creacion-productos",
     icon: FileBox,
+  },
+  {
+    title: "Tipos de Producto",
+    route: "/dashboard/tipos-producto",
+    icon: Tags,
   },
   {
     title: "Gestión de Bodegas",

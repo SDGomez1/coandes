@@ -28,7 +28,6 @@ import { Button } from "@/components/ui/button";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PaginationControls } from "./PaginationControls";
-import { useRouter } from "next/navigation";
 
 type WarehouseInventoryRow = {
   _id: Id<"inventoryLots">;
@@ -37,6 +36,9 @@ type WarehouseInventoryRow = {
   productType: string;
   supplierName: string;
   quantity: number;
+  presentation?: string;
+  equivalence?: string;
+  averageWeight?: number;
 };
 
 const columnHelper = createColumnHelper<WarehouseInventoryRow>();
@@ -46,6 +48,40 @@ function formatNumber(value: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+function parsePositiveNumber(value: string | number | undefined) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
+function getPresentationLabel(
+  presentation: string | undefined,
+  quantity: number,
+) {
+  const normalizedLabel = (presentation ?? "").trim();
+  if (!normalizedLabel) return "";
+  if (quantity === 1 || normalizedLabel.toLowerCase().endsWith("s")) {
+    return normalizedLabel;
+  }
+  return `${normalizedLabel}s`;
+}
+
+function getEquivalentQuantity(row: WarehouseInventoryRow) {
+  const averageWeight = row.averageWeight ?? 0;
+  if (averageWeight <= 0) {
+    return null;
+  }
+  const presentationLabel = (row.presentation ?? "").trim();
+  if (!presentationLabel) {
+    return null;
+  }
+
+  const equivalence = parsePositiveNumber(row.equivalence) ?? 1;
+  return (row.quantity * equivalence) / averageWeight;
 }
 
 export default function WarehouseInventoryTable({
@@ -64,7 +100,6 @@ export default function WarehouseInventoryTable({
   );
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
-  const router = useRouter();
 
   const columns = useMemo(
     () => [
@@ -145,7 +180,7 @@ export default function WarehouseInventoryTable({
             selectedWarehouse?.baseUnit as WeightUnit,
           );
           return (
-            <p className="w-1/2 text-right">{`${formatNumber(displayValue)} ${selectedWarehouse?.baseUnit}`}</p>
+            <p className="w-full text-right tabular-nums">{`${formatNumber(displayValue)} ${selectedWarehouse?.baseUnit}`}</p>
           );
         },
       }),
@@ -172,7 +207,39 @@ export default function WarehouseInventoryTable({
             "kg" as WeightUnit,
           );
           return (
-            <p className="w-1/2  text-right">{`${formatNumber(displayValue)} `}</p>
+            <p className="w-full text-right tabular-nums">{`${formatNumber(displayValue)} `}</p>
+          );
+        },
+      }),
+      columnHelper.accessor((row) => getEquivalentQuantity(row), {
+        id: "equivalenceUnitQuantity",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Equivalencia
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => {
+          const equivalenceQuantity = info.getValue();
+          if (equivalenceQuantity === null || equivalenceQuantity === undefined) {
+            return "N/A";
+          }
+          const label = getPresentationLabel(
+            info.row.original.presentation,
+            equivalenceQuantity,
+          );
+          if (!label) return "N/A";
+          return (
+            <p className="w-full text-right tabular-nums">
+              {`${formatNumber(equivalenceQuantity)} ${label}`}
+            </p>
           );
         },
       }),
@@ -190,7 +257,7 @@ export default function WarehouseInventoryTable({
         ),
       }),*/
     ],
-    [router],
+    [selectedWarehouse?.baseUnit],
   );
 
   const table = useReactTable({

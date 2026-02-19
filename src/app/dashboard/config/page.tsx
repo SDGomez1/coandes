@@ -4,6 +4,8 @@ import { api } from "../../../../convex/_generated/api";
 import { fetchAuthQuery } from "@/lib/auth-server";
 import { Id } from "../../../../convex/betterAuth/_generated/dataModel";
 import { useQuery } from "convex/react";
+import BreadCrumb from "@/components/dashboard/BreadCrumb";
+import { Separator } from "@/components/ui/separator";
 
 export function Config() {
   const userData = useQuery(api.auth.getAuthUser);
@@ -17,10 +19,16 @@ export function Config() {
   };
 
   return (
-    <div className="p-4 md:p-10">
-      <h1 className="text-2xl font-bold mb-6">Configuración</h1>
-      <ConfigPage userData={typedUserData} />
-    </div>
+    <>
+      <div className="px-4 lg:px-8">
+        <BreadCrumb />
+        <Separator />
+      </div>
+      <div className="p-4 md:p-10">
+        <h1 className="text-2xl font-bold mb-6">Configuración</h1>
+        <ConfigPage userData={typedUserData} />
+      </div>
+    </>
   );
 }
 
