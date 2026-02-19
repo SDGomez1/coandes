@@ -42,9 +42,14 @@ type WarehouseInventoryRow = {
 };
 
 const columnHelper = createColumnHelper<WarehouseInventoryRow>();
+const PRODUCT_TYPE_LABELS: Record<string, string> = {
+  "Raw Material": "Materia Prima",
+  "Finished Good": "Producto Terminado",
+  "By-product": "Subproducto",
+};
 
 function formatNumber(value: number) {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("es-CO", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
@@ -84,6 +89,14 @@ function getEquivalentQuantity(row: WarehouseInventoryRow) {
   return (row.quantity * equivalence) / averageWeight;
 }
 
+function getProductTypeLabel(productType: string) {
+  return PRODUCT_TYPE_LABELS[productType] ?? productType;
+}
+
+function getSupplierLabel(supplierName: string) {
+  return supplierName === "N/A" ? "No aplica" : supplierName;
+}
+
 export default function WarehouseInventoryTable({
   warehouseId,
   organizationId,
@@ -120,7 +133,7 @@ export default function WarehouseInventoryTable({
         cell: (info) => info.getValue(),
       }),
       columnHelper.accessor(
-        (row) => `${row.productName} / ${row.supplierName}`,
+        (row) => `${row.productName} / ${getSupplierLabel(row.supplierName)}`,
         {
           id: "itemSupplier",
           header: ({ column }) => (
@@ -130,7 +143,7 @@ export default function WarehouseInventoryTable({
                 column.toggleSorting(column.getIsSorted() === "asc")
               }
             >
-              Item/Proveedor
+              Producto/Proveedor
               {column.getIsSorted() === "asc" ? (
                 <ArrowUp className="ml-2 h-4 w-4" />
               ) : (
@@ -141,7 +154,8 @@ export default function WarehouseInventoryTable({
           cell: (info) => <em>{info.getValue()}</em>,
         },
       ),
-      columnHelper.accessor("productType", {
+      columnHelper.accessor((row) => getProductTypeLabel(row.productType), {
+        id: "productType",
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -174,7 +188,7 @@ export default function WarehouseInventoryTable({
         ),
         cell: (info) => {
           const quantity = info.getValue();
-          if (quantity === null || quantity === undefined) return "N/A";
+          if (quantity === null || quantity === undefined) return "No aplica";
           const displayValue = convertFromCanonical(
             quantity,
             selectedWarehouse?.baseUnit as WeightUnit,
@@ -201,7 +215,7 @@ export default function WarehouseInventoryTable({
         ),
         cell: (info) => {
           const quantity = info.getValue();
-          if (quantity === null || quantity === undefined) return "N/A";
+          if (quantity === null || quantity === undefined) return "No aplica";
           const displayValue = convertFromCanonical(
             quantity,
             "kg" as WeightUnit,
@@ -229,13 +243,13 @@ export default function WarehouseInventoryTable({
         cell: (info) => {
           const equivalenceQuantity = info.getValue();
           if (equivalenceQuantity === null || equivalenceQuantity === undefined) {
-            return "N/A";
+            return "No aplica";
           }
           const label = getPresentationLabel(
             info.row.original.presentation,
             equivalenceQuantity,
           );
-          if (!label) return "N/A";
+          if (!label) return "No aplica";
           return (
             <p className="w-full text-right tabular-nums">
               {`${formatNumber(equivalenceQuantity)} ${label}`}
@@ -329,7 +343,7 @@ export default function WarehouseInventoryTable({
     <div className="mt-8 flow-root">
       <div className="flex items-center justify-between mb-4">
         <Input
-          placeholder="Buscar por item, proveedor o tiquete..."
+          placeholder="Buscar por producto, proveedor o tiquete..."
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
