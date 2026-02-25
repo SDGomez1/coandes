@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ExportActions } from "../exportaciones/ExportActions";
 
 export default function AdminDashboard() {
   const organizations = useQuery(api.organizations.list);
@@ -118,63 +119,76 @@ export default function AdminDashboard() {
                 {" "}
                 Miembros de la organización
               </h2>
-              <Dialog
-                open={isAddUserDialogOpen}
-                onOpenChange={setIsAddUserDialogOpen}
-              >
-                <DialogTrigger asChild>
-                  <Button>Añadir usuario</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Añadir nuevo usuario</DialogTitle>
-                    <DialogDescription>
-                      Añade un nuevo usuario a la organización.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="email" className="text-right">
-                        Email
-                      </Label>
-                      <Input
-                        id="email"
-                        value={newUserEmail}
-                        onChange={(e) => setNewUserEmail(e.target.value)}
-                        className="col-span-3"
-                      />
+              <div className="flex items-center gap-2">
+                <ExportActions
+                  organizationId={selectedOrg}
+                  moduleName="admin_usuarios_organizacion"
+                  fileBaseName="admin-usuarios-organizacion"
+                  rows={users ?? []}
+                  columns={[
+                    { header: "Nombre", value: (row) => row?.name || "N/A" },
+                    { header: "Correo", value: (row) => row?.email || "" },
+                    { header: "Rol", value: (row) => row?.role || "" },
+                  ]}
+                />
+                <Dialog
+                  open={isAddUserDialogOpen}
+                  onOpenChange={setIsAddUserDialogOpen}
+                >
+                  <DialogTrigger asChild>
+                    <Button>Añadir usuario</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Añadir nuevo usuario</DialogTitle>
+                      <DialogDescription>
+                        Añade un nuevo usuario a la organización.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="email" className="text-right">
+                          Email
+                        </Label>
+                        <Input
+                          id="email"
+                          value={newUserEmail}
+                          onChange={(e) => setNewUserEmail(e.target.value)}
+                          className="col-span-3"
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="role" className="text-right">
+                          Rol
+                        </Label>
+                        <Select
+                          onValueChange={(
+                            value: "admin" | "superAdmin" | "user",
+                          ) => setNewUserRole(value)}
+                          defaultValue={newUserRole}
+                        >
+                          <SelectTrigger className="col-span-3">
+                            <SelectValue placeholder="Select a role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="user">User</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="role" className="text-right">
-                        Rol
-                      </Label>
-                      <Select
-                        onValueChange={(
-                          value: "admin" | "superAdmin" | "user",
-                        ) => setNewUserRole(value)}
-                        defaultValue={newUserRole}
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsAddUserDialogOpen(false)}
                       >
-                        <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="user">User</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsAddUserDialogOpen(false)}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button onClick={handleSaveUser}>Guardar</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                        Cancelar
+                      </Button>
+                      <Button onClick={handleSaveUser}>Guardar</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
             <Table>
               <TableHeader>

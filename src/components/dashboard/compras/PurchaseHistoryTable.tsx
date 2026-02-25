@@ -44,6 +44,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ExportActions } from "../exportaciones/ExportActions";
 
 type PurchaseHistoryRow = {
   _id: Id<"inventoryLots">;
@@ -350,6 +351,36 @@ export default function PurchaseHistoryTable() {
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
+        />
+        <ExportActions
+          organizationId={orgId}
+          moduleName="historial_compras"
+          fileBaseName="historial-compras"
+          rows={data}
+          columns={[
+            { header: "No. Tiquete", value: (row) => row.lotNumber },
+            { header: "Producto", value: (row) => row.productName },
+            { header: "Proveedor", value: (row) => row.supplierName },
+            {
+              header: "Fecha Ingreso",
+              value: (row) => new Date(row.creationDate).toLocaleDateString(),
+            },
+            { header: "Bodega", value: (row) => row.warehouseName },
+            { header: "Placa Vehículo", value: (row) => row.vehicleInfo },
+            {
+              header: "Cantidad (kg)",
+              value: (row) => formatNumber(convertFromCanonical(row.quantity, "kg")),
+            },
+            {
+              header: "Equivalencia",
+              value: (row) => {
+                const eq = getEquivalentQuantity(row);
+                if (eq === null) return "N/A";
+                const label = getPresentationLabel(row.presentation, eq);
+                return label ? `${formatNumber(eq)} ${label}` : "N/A";
+              },
+            },
+          ]}
         />
       </div>
       <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">

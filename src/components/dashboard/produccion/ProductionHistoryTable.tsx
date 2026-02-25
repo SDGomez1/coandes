@@ -45,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ExportActions } from "../exportaciones/ExportActions";
 
 type ProductionHistoryRow = {
   _id: Id<"productionRuns">;
@@ -469,6 +470,68 @@ export default function ProductionHistoryTable() {
     );
   }
 
+  const exportRows = viewMode === "entries" ? entryData : outputData;
+  const exportColumns =
+    viewMode === "entries"
+      ? [
+          {
+            header: "Fecha",
+            value: (row: ProductionEntryRow) =>
+              new Date(row.runDate).toLocaleDateString(),
+          },
+          { header: "Producto Entrada", value: (row: ProductionEntryRow) => row.inputProductName },
+          { header: "Lote Entrada", value: (row: ProductionEntryRow) => row.inputLotNumber },
+          {
+            header: "Cantidad Consumida (kg)",
+            value: (row: ProductionEntryRow) =>
+              formatNumber(
+                convertFromCanonical(
+                  row.quantityConsumed.value,
+                  row.quantityConsumed.unit as WeightUnit,
+                ),
+              ),
+          },
+          { header: "No. Salidas", value: (row: ProductionEntryRow) => row.outputsCount },
+        ]
+      : [
+          {
+            header: "Fecha",
+            value: (row: FlatProductionHistoryRow) =>
+              new Date(row.runDate).toLocaleDateString(),
+          },
+          { header: "Producto Entrada", value: (row: FlatProductionHistoryRow) => row.inputProductName },
+          { header: "Lote Entrada", value: (row: FlatProductionHistoryRow) => row.inputLotNumber },
+          {
+            header: "Cantidad Consumida (kg)",
+            value: (row: FlatProductionHistoryRow) =>
+              formatNumber(
+                convertFromCanonical(
+                  row.quantityConsumed.value,
+                  row.quantityConsumed.unit as WeightUnit,
+                ),
+              ),
+          },
+          { header: "Producto Salida", value: (row: FlatProductionHistoryRow) => row.outputProduct },
+          {
+            header: "Cantidad Producida (kg)",
+            value: (row: FlatProductionHistoryRow) =>
+              formatNumber(
+                convertFromCanonical(
+                  row.quantityProduced.value,
+                  row.quantityProduced.unit as WeightUnit,
+                ),
+              ),
+          },
+          { header: "Nuevo Lote", value: (row: FlatProductionHistoryRow) => row.newLotNumber },
+          {
+            header: "Factores de Calidad",
+            value: (row: FlatProductionHistoryRow) =>
+              row.qualityFactors.length > 0
+                ? row.qualityFactors.map((factor) => `${factor.name}: ${factor.value}`).join(" | ")
+                : "N/A",
+          },
+        ];
+
   return (
     <div className="mt-8 flow-root">
       <div className="flex flex-wrap gap-2 mb-4">
@@ -496,6 +559,21 @@ export default function ProductionHistoryTable() {
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
+        />
+        <ExportActions
+          organizationId={orgId}
+          moduleName={
+            viewMode === "entries"
+              ? "historial_produccion_entradas"
+              : "historial_produccion_salidas"
+          }
+          fileBaseName={
+            viewMode === "entries"
+              ? "historial-produccion-entradas"
+              : "historial-produccion-salidas"
+          }
+          rows={exportRows as any[]}
+          columns={exportColumns as any}
         />
       </div>
       {viewMode === "entries" ? (

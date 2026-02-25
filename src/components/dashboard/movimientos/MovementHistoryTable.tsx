@@ -29,6 +29,7 @@ import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { PaginationControls } from "../bodega/PaginationControls";
 import { convertFromCanonical } from "@/lib/units";
 import { cn, formatNumber } from "@/lib/utils";
+import { ExportActions } from "../exportaciones/ExportActions";
 
 type MovementHistoryRow = {
   _id: Id<"activityLog">;
@@ -268,6 +269,27 @@ export default function MovementHistoryTable() {
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
+        />
+        <ExportActions
+          organizationId={orgId}
+          moduleName="historial_movimientos"
+          fileBaseName="historial-movimientos"
+          rows={data}
+          columns={[
+            { header: "Fecha", value: (row) => new Date(row.timestamp).toLocaleString() },
+            { header: "Etapa", value: (row) => getActivityLabel(row.activityType) },
+            { header: "Producto", value: (row) => row.productName },
+            { header: "Bodega", value: (row) => row.warehouseName },
+            { header: "No. Tiquete", value: (row) => row.lotNumber },
+            {
+              header: "Movimiento (kg)",
+              value: (row) => {
+                const movementKg = convertFromCanonical(row.quantityChange, "kg");
+                const prefix = movementKg > 0 ? "+" : "";
+                return `${prefix}${formatNumber(movementKg)}`;
+              },
+            },
+          ]}
         />
       </div>
       <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">

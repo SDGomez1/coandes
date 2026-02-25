@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PaginationControls } from "./PaginationControls";
+import { ExportActions } from "../exportaciones/ExportActions";
 
 type WarehouseInventoryRow = {
   _id: Id<"inventoryLots">;
@@ -274,6 +275,8 @@ export default function WarehouseInventoryTable({
     [selectedWarehouse?.baseUnit],
   );
 
+  const exportRows = data?.items ?? [];
+
   const table = useReactTable({
     data: data?.items ?? [],
     columns,
@@ -347,6 +350,48 @@ export default function WarehouseInventoryTable({
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
+        />
+        <ExportActions
+          organizationId={organizationId}
+          moduleName="inventario_bodega"
+          fileBaseName="inventario-bodega"
+          rows={exportRows}
+          columns={[
+            { header: "No. Tiquete", value: (row) => row.lotNumber },
+            { header: "Producto", value: (row) => row.productName },
+            {
+              header: "Tipo de Producto",
+              value: (row) => getProductTypeLabel(row.productType),
+            },
+            {
+              header: "Proveedor",
+              value: (row) => getSupplierLabel(row.supplierName),
+            },
+            {
+              header: "Peso (Unidad Original)",
+              value: (row) =>
+                `${formatNumber(
+                  convertFromCanonical(
+                    row.quantity,
+                    (selectedWarehouse?.baseUnit ?? "kg") as WeightUnit,
+                  ),
+                )} ${selectedWarehouse?.baseUnit ?? "kg"}`,
+            },
+            {
+              header: "Peso (kg)",
+              value: (row) =>
+                formatNumber(convertFromCanonical(row.quantity, "kg")),
+            },
+            {
+              header: "Equivalencia",
+              value: (row) => {
+                const qty = getEquivalentQuantity(row);
+                if (!qty) return "No aplica";
+                const label = getPresentationLabel(row.presentation, qty);
+                return label ? `${formatNumber(qty)} ${label}` : "No aplica";
+              },
+            },
+          ]}
         />
       </div>
       <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">

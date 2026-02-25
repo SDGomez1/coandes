@@ -21,6 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { ExportActions } from "../exportaciones/ExportActions";
 
 const BASE_TYPE_OPTIONS = [
   { value: "Raw Material", label: "Materia Prima" },
@@ -153,6 +154,23 @@ export default function ProductTypesManager() {
       </div>
 
       <div className="border rounded-lg overflow-hidden">
+        <div className="p-4 border-b flex justify-end">
+          <ExportActions
+            organizationId={orgId}
+            moduleName="tipos_producto"
+            fileBaseName="tipos-producto"
+            rows={productTypes ?? []}
+            columns={[
+              { header: "Nombre", value: (row) => row.name },
+              {
+                header: "Categoría base",
+                value: (row) =>
+                  BASE_TYPE_OPTIONS.find((o) => o.value === row.baseType)?.label ??
+                  row.baseType,
+              },
+            ]}
+          />
+        </div>
         <Table>
           <TableHeader>
             <TableRow>

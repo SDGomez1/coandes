@@ -44,6 +44,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ExportActions } from "../exportaciones/ExportActions";
 
 type DispatchHistoryRow = {
   _id: Id<"dispatchLineItems">;
@@ -340,6 +341,35 @@ export default function DispatchHistoryTable() {
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
+        />
+        <ExportActions
+          organizationId={orgId}
+          moduleName="historial_despachos"
+          fileBaseName="historial-despachos"
+          rows={data}
+          columns={[
+            {
+              header: "Fecha Despacho",
+              value: (row) => new Date(row.dispatchDate).toLocaleDateString(),
+            },
+            { header: "Cliente", value: (row) => row.customerName },
+            { header: "No. Tiquete", value: (row) => row.lotNumber },
+            { header: "No. Tiquete Despacho", value: (row) => row.lotNumberDispatch },
+            { header: "Producto", value: (row) => row.productName },
+            {
+              header: "Cantidad (kg)",
+              value: (row) => formatNumber(convertFromCanonical(row.quantityDispatched, "kg")),
+            },
+            {
+              header: "Equivalencia",
+              value: (row) => {
+                const eq = getEquivalentQuantity(row);
+                if (eq === null) return "N/A";
+                const label = getPresentationLabel(row.presentation, eq);
+                return label ? `${formatNumber(eq)} ${label}` : "N/A";
+              },
+            },
+          ]}
         />
       </div>
       <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">

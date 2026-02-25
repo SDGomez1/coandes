@@ -57,6 +57,7 @@ import { useDebounce } from "use-debounce";
 import { toast } from "sonner";
 import { Id as authId } from "../../../../convex/betterAuth/_generated/dataModel";
 import { Id } from "../../../../convex/_generated/dataModel";
+import { ExportActions } from "../exportaciones/ExportActions";
 
 type User = {
   userConfigId: Id<"userConfig">;
@@ -251,6 +252,23 @@ export function ConfigPage({ userData }: { userData: any }) {
                   <Button type="submit">Agregar Usuario</Button>
                 </form>
               </Form>
+            </div>
+            <div className="mb-4 flex justify-end">
+              <ExportActions
+                organizationId={org?._id as Id<"organizations"> | undefined}
+                moduleName="config_usuarios_organizacion"
+                fileBaseName="config-usuarios-organizacion"
+                rows={
+                  (organizationUsers ?? []).filter(
+                    (user) => user.role !== "superAdmin",
+                  ) as Array<{ name: string; email: string; role: string }>
+                }
+                columns={[
+                  { header: "Nombre", value: (row) => row.name },
+                  { header: "Correo Electrónico", value: (row) => row.email },
+                  { header: "Rol", value: (row) => row.role },
+                ]}
+              />
             </div>
             <Table>
               <TableHeader>

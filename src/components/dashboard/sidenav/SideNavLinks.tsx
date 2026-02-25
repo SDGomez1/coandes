@@ -13,6 +13,7 @@ import {
   BadgeCheck,
   Tags,
   History,
+  FileDown,
 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -46,6 +47,11 @@ export const mainLinks = [
     title: "Movimientos",
     route: "/dashboard/historial-movimientos",
     icon: History,
+  },
+  {
+    title: "Exportaciones",
+    route: "/dashboard/exportaciones",
+    icon: FileDown,
   },
 ];
 

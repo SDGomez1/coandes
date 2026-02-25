@@ -208,4 +208,19 @@ export default defineSchema({
   })
     .index("by_org", ["organizationId"])
     .index("by_lot", ["inventoryLotId"]),
+
+  exportRecords: defineTable({
+    organizationId: v.id("organizations"),
+    module: v.string(),
+    fileName: v.string(),
+    format: v.union(v.literal("csv"), v.literal("excel")),
+    mimeType: v.string(),
+    storageId: v.id("_storage"),
+    rowCount: v.number(),
+    createdBy: v.optional(v.string()),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+  })
+    .index("by_org", ["organizationId"])
+    .index("by_expires", ["expiresAt"]),
 });
