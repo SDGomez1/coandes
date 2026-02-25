@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -64,6 +64,7 @@ export default function CreateProductionOutputFlow() {
         inputProductName: string;
         inputLotNumber: string;
         runDate: number;
+        outputsCount: number;
       }>
     | undefined;
 
@@ -91,6 +92,10 @@ export default function CreateProductionOutputFlow() {
 
   const selectedRun = (productionRuns ?? []).find((run) => run._id === selectedRunId);
 
+  useEffect(() => {
+    form.setValue("outputs", []);
+  }, [form, selectedRunId]);
+
   const possibleOutputs = useQuery(
     api.products.getPossibleOutputs,
     selectedRun?.inputProductId
@@ -107,10 +112,15 @@ export default function CreateProductionOutputFlow() {
     const firstOutput = possibleOutputs[0];
     if (!firstOutput) return;
 
+    const nextOutputIndex = (selectedRun?.outputsCount ?? 0) + fields.length + 1;
+    const suggestedLotNumber = `${selectedRun?.inputLotNumber ?? "LOTE"}_SP_${nextOutputIndex
+      .toString()
+      .padStart(2, "0")}`;
+
     append({
       productId: firstOutput._id,
       quantityProduced: 0,
-      lotNumber: `${selectedRun?.inputLotNumber ?? "LOTE"}_SP_${(fields.length + 1).toString().padStart(2, "0")}`,
+      lotNumber: suggestedLotNumber,
       warehouseId: warehouses?.[0]?._id ?? "",
       qualityFactors: [],
     });
@@ -136,7 +146,11 @@ export default function CreateProductionOutputFlow() {
       form.reset({ productionRunId: "", outputs: [] });
     } catch (error) {
       console.error(error);
-      toast.error("Error al registrar la salida de producción.");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Error al registrar la salida de producción.",
+      );
     } finally {
       setIsSubmitting(false);
     }

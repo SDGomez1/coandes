@@ -217,6 +217,10 @@ export const getPurchaseHistory = query({
         const product = await ctx.db.get(lot.productId);
         const warehouse = await ctx.db.get(lot.warehouseId);
         const purchase = await ctx.db.get(lot.source.purchaseId);
+        const purchaseRecordedQuantity = await getPurchasedQuantityForLot(
+          ctx,
+          lot,
+        );
 
         let supplierName = "N/A";
         if (purchase?.supplierId) {
@@ -235,7 +239,7 @@ export const getPurchaseHistory = query({
           supplierName: supplierName,
           creationDate: lot.creationDate,
           warehouseName: warehouse?.name ?? "Bodega no encontrada",
-          quantity: lot.quantity,
+          quantity: purchaseRecordedQuantity,
           unit: product?.baseUnit ?? "N/A",
           presentation: product?.presentation ?? "",
           equivalence: product?.equivalence ?? "",
@@ -279,6 +283,10 @@ export const getTopSuppliersByPurchase = query({
     const suppliers = new Map<string, { name: string; value: number }>();
     for (const purchase of purchases) {
       if (purchase.source.type === "purchase") {
+        const purchaseRecordedQuantity = await getPurchasedQuantityForLot(
+          ctx,
+          purchase,
+        );
         const p = await ctx.db.get(purchase.source.purchaseId);
         if (p?.supplierId) {
           const supplier = await ctx.db.get(p.supplierId);
@@ -286,7 +294,7 @@ export const getTopSuppliersByPurchase = query({
             const currentQuantity = suppliers.get(supplier._id)?.value ?? 0;
             suppliers.set(supplier._id, {
               name: supplier.name,
-              value: currentQuantity + purchase.quantity,
+              value: currentQuantity + purchaseRecordedQuantity,
             });
           }
         }
@@ -355,11 +363,15 @@ export const getPurchasesVsDispatches = query({
     // 6. Aggregate Purchase quantities
     for (const purchase of purchases) {
       const key = new Date(purchase.creationDate).toISOString().split("T")[0];
+      const purchaseRecordedQuantity = await getPurchasedQuantityForLot(
+        ctx,
+        purchase,
+      );
       const current = data.get(key);
       if (current) {
         data.set(key, {
           ...current,
-          compras: current.compras + purchase.quantity,
+          compras: current.compras + purchaseRecordedQuantity,
         });
       }
     }
@@ -392,3 +404,33 @@ export const getPurchasesVsDispatches = query({
       }));
   },
 });
+
+async function getPurchasedQuantityForLot(ctx: any, lot: any): Promise<number> {
+  if (lot.source.type !== "purchase") {
+    return lot.quantity;
+  }
+
+  const lotActivity = await ctx.db
+    .query("activityLog")
+    .withIndex("by_lot", (q: any) => q.eq("inventoryLotId", lot._id))
+    .collect();
+
+  if (lotActivity.length === 0) {
+    return lot.quantity;
+  }
+
+  const nonPurchaseMovementDelta = lotActivity.reduce((acc: number, entry: any) => {
+    const isPurchaseRegistration =
+      entry.activityType === "reception" ||
+      (entry.activityType === "adjustment" &&
+        entry.relatedId === lot.source.purchaseId);
+
+    if (isPurchaseRegistration) {
+      return acc;
+    }
+
+    return acc + entry.quantityChange;
+  }, 0);
+
+  return lot.quantity - nonPurchaseMovementDelta;
+}
