@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { es } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -57,6 +58,8 @@ export function DatePicker({
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="single"
+          locale={es}
+          showOutsideDays={false}
           selected={value}
           onSelect={(date) => {
             onChange(date);

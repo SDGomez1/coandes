@@ -392,20 +392,21 @@ export default function DispatchHistoryTable() {
   if (filteredData.length === 0) {
     return (
       <div className="mt-8 flow-root">
-        <div className="flex flex-col gap-4 mb-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="mb-4 flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
           <Input
             placeholder="Buscar por item, proveedor o tiquete..."
             value={globalFilter ?? ""}
             onChange={(e) => setGlobalFilter(e.target.value)}
             className="max-w-lg"
           />
-          <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <DateRangePicker value={dateRange} onChange={setDateRange} />
             <Button
               type="button"
               variant="outline"
               onClick={() => setDateRange(undefined)}
               disabled={!dateRange?.from}
+              className="whitespace-nowrap"
             >
               Limpiar fechas
             </Button>
@@ -422,20 +423,21 @@ export default function DispatchHistoryTable() {
 
   return (
     <div className="mt-8 flow-root">
-      <div className="flex flex-col gap-4 mb-4 xl:flex-row xl:items-center xl:justify-between">
+      <div className="mb-4 flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <Input
           placeholder="Buscar por item, proveedor o tiquete..."
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
         />
-        <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <DateRangePicker value={dateRange} onChange={setDateRange} />
           <Button
             type="button"
             variant="outline"
             onClick={() => setDateRange(undefined)}
             disabled={!dateRange?.from}
+            className="whitespace-nowrap"
           >
             Limpiar fechas
           </Button>

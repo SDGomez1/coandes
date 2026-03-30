@@ -7,6 +7,7 @@ import {
   subDays,
   subMonths,
 } from "date-fns";
+import { es } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 
@@ -26,6 +27,15 @@ type DateRangePickerProps = {
   placeholder?: string;
   className?: string;
 };
+
+function rangesMatch(left?: DateRange, right?: DateRange) {
+  const leftFrom = left?.from?.getTime();
+  const leftTo = left?.to?.getTime();
+  const rightFrom = right?.from?.getTime();
+  const rightTo = right?.to?.getTime();
+
+  return leftFrom === rightFrom && leftTo === rightTo;
+}
 
 export function DateRangePicker({
   value,
@@ -91,6 +101,15 @@ export function DateRangePicker({
     applyCompletedRange({ from: draftRange.from, to: clickedDay });
   }
 
+  const triggerLabel = draftRange?.from
+    ? formatDateRangeLabel(draftRange.from, draftRange.to)
+    : placeholder;
+
+  const helperText =
+    draftRange?.from && !draftRange.to
+      ? "Seleccione la fecha final para aplicar el rango."
+      : "Seleccione la fecha inicial o use un rango rápido.";
+
   return (
     <Popover
       open={open}
@@ -106,36 +125,49 @@ export function DateRangePicker({
           type="button"
           variant="outline"
           className={cn(
-            "w-full justify-between text-left font-normal md:w-[320px]",
+            "w-full min-w-0 justify-between rounded-lg text-left font-normal sm:w-[420px] lg:w-[460px]",
             !draftRange?.from && "text-muted-foreground",
             className,
           )}
+          title={triggerLabel}
         >
-          <span className="truncate">
-            {draftRange?.from
-              ? formatDateRangeLabel(draftRange.from, draftRange.to)
-              : placeholder}
-          </span>
-          <CalendarIcon className="size-4" />
+          <span className="truncate pr-2">{triggerLabel}</span>
+          <CalendarIcon className="size-4 shrink-0" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <div className="flex flex-wrap gap-2 border-b p-2">
-          {quickSelects.map((quickSelect) => (
-            <Button
-              key={quickSelect.label}
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => applyCompletedRange(quickSelect.range)}
-            >
-              {quickSelect.label}
-            </Button>
-          ))}
+      <PopoverContent
+        className="w-[min(100vw-1rem,44rem)] gap-0 overflow-hidden p-0 sm:w-auto"
+        align="start"
+      >
+        <div className="border-b bg-muted/20 p-3">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            {quickSelects.map((quickSelect) => {
+              const isActive = rangesMatch(draftRange, quickSelect.range);
+
+              return (
+                <Button
+                  key={quickSelect.label}
+                  type="button"
+                  size="sm"
+                  variant={isActive ? "secondary" : "ghost"}
+                  className={cn(
+                    "justify-center rounded-full px-3 text-xs font-medium sm:text-sm",
+                    isActive && "ring-1 ring-primary/20",
+                  )}
+                  onClick={() => applyCompletedRange(quickSelect.range)}
+                >
+                  {quickSelect.label}
+                </Button>
+              );
+            })}
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">{helperText}</p>
         </div>
         <Calendar
           mode="range"
+          locale={es}
           numberOfMonths={2}
+          showOutsideDays={false}
           selected={draftRange}
           onDayClick={handleDayClick}
           disabled={(date) => toLocalCalendarDate(date) > today}
