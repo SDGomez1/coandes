@@ -96,6 +96,10 @@ export default defineSchema({
     organizationId: v.id("organizations"),
     inputProductId: v.id("products"),
     outputProductId: v.id("products"),
+    // Legacy compatibility field; new merma selection is stored per production output.
+    outputType: v.optional(
+      v.union(v.literal("standard"), v.literal("merma")),
+    ),
   })
     .index("by_org", ["organizationId"])
     .index("by_input", ["inputProductId"]),
@@ -170,7 +174,12 @@ export default defineSchema({
     productId: v.id("products"),
     quantityProduced: v.number(),
     resultingInventoryLotId: v.optional(v.id("inventoryLots")),
-  }).index("by_run", ["productionRunId"]),
+    outputType: v.optional(
+      v.union(v.literal("standard"), v.literal("merma")),
+    ),
+  })
+    .index("by_run", ["productionRunId"])
+    .index("by_resulting_inventory_lot", ["resultingInventoryLotId"]),
 
   lotQuality: defineTable({
     productionOutputId: v.id("productionOutputs"),
@@ -190,6 +199,14 @@ export default defineSchema({
     inventoryLotId: v.id("inventoryLots"),
     quantityDispatched: v.number(),
     ticketNumber: v.string(),
+    qualitySnapshot: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          value: v.string(),
+        }),
+      ),
+    ),
   }).index("by_dispatch", ["dispatchId"]),
 
   activityLog: defineTable({

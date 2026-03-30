@@ -22,7 +22,7 @@ import {
   type Table as TanStackTable,
   useReactTable,
 } from "@tanstack/react-table";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { convertFromCanonical, convertToCanonical, WeightUnit } from "@/lib/units";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ import { ArrowDown, ArrowUp, SquarePen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PaginationControls } from "../bodega/PaginationControls";
 import { formatNumber } from "@/lib/utils";
+import type { ExportColumn } from "@/lib/export-utils";
 import {
   Dialog,
   DialogContent,
@@ -50,17 +51,20 @@ import { ExportActions } from "../exportaciones/ExportActions";
 type ProductionHistoryRow = {
   _id: Id<"productionRuns">;
   inputLotId: Id<"inventoryLots">;
+  inputProductId?: Id<"products">;
   runDate: number;
   inputProductName: string;
   inputLotNumber: string;
   quantityConsumed: number;
   inputUnit: string;
+  notes?: string;
   outputs: {
     _id: Id<"productionOutputs">;
     productId: Id<"products">;
     productName: string;
     quantityProduced: number;
     resultingInventoryLotId?: Id<"inventoryLots">;
+    outputType: "standard" | "merma";
     warehouseId?: Id<"warehouse">;
     newLotNumber: string;
     unit: string;
@@ -77,6 +81,7 @@ type FlatProductionHistoryRow = {
   runDate: number;
   inputProductName: string;
   inputLotNumber: string;
+  outputType: "standard" | "merma";
   quantityConsumed: { value: number; unit: string };
   outputProduct: string;
   quantityProduced: { value: number; unit: string };
@@ -86,15 +91,22 @@ type FlatProductionHistoryRow = {
 
 type ProductionEntryRow = {
   runId: Id<"productionRuns">;
+  inputLotId: Id<"inventoryLots">;
+  inputProductId?: Id<"products">;
   runDate: number;
   inputProductName: string;
   inputLotNumber: string;
   quantityConsumed: { value: number; unit: string };
+  notes?: string;
   outputsCount: number;
 };
 
 const outputColumnHelper = createColumnHelper<FlatProductionHistoryRow>();
 const entryColumnHelper = createColumnHelper<ProductionEntryRow>();
+const OUTPUT_TYPE_LABELS = {
+  standard: "No",
+  merma: "Sí",
+} as const;
 
 export default function ProductionHistoryTable() {
   const organization = useQuery(api.organizations.getOrg);
@@ -118,6 +130,7 @@ export default function ProductionHistoryTable() {
         runDate: run.runDate,
         inputProductName: run.inputProductName,
         inputLotNumber: run.inputLotNumber,
+        outputType: output.outputType,
         quantityConsumed: {
           value: run.quantityConsumed,
           unit: run.inputUnit,
@@ -137,6 +150,8 @@ export default function ProductionHistoryTable() {
     if (!historyData) return [];
     return historyData.map((run: ProductionHistoryRow) => ({
       runId: run._id,
+      inputLotId: run.inputLotId,
+      inputProductId: run.inputProductId,
       runDate: run.runDate,
       inputProductName: run.inputProductName,
       inputLotNumber: run.inputLotNumber,
@@ -144,6 +159,7 @@ export default function ProductionHistoryTable() {
         value: run.quantityConsumed,
         unit: run.inputUnit,
       },
+      notes: run.notes,
       outputsCount: run.outputs.length,
     }));
   }, [historyData]);
@@ -246,6 +262,22 @@ export default function ProductionHistoryTable() {
         ),
         cell: (info) => info.getValue(),
       }),
+      outputColumnHelper.accessor("outputType", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Merma
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => OUTPUT_TYPE_LABELS[info.getValue()],
+      }),
       outputColumnHelper.accessor("quantityProduced", {
         header: ({ column }) => (
           <Button
@@ -308,7 +340,7 @@ export default function ProductionHistoryTable() {
         id: "actions",
         header: "Acciones",
         cell: ({ row }) => (
-          <EditProductionEntryDialog
+          <EditProductionOutputDialog
             entry={row.original}
             warehouses={warehouses ?? []}
           />
@@ -411,6 +443,11 @@ export default function ProductionHistoryTable() {
         ),
         cell: (info) => <p className="w-full text-right tabular-nums">{info.getValue()}</p>,
       }),
+      entryColumnHelper.display({
+        id: "actions",
+        header: "Acciones",
+        cell: ({ row }) => <EditProductionRunEntryDialog entry={row.original} />,
+      }),
     ],
     [],
   );
@@ -470,67 +507,69 @@ export default function ProductionHistoryTable() {
     );
   }
 
-  const exportRows = viewMode === "entries" ? entryData : outputData;
-  const exportColumns =
-    viewMode === "entries"
-      ? [
-          {
-            header: "Fecha",
-            value: (row: ProductionEntryRow) =>
-              new Date(row.runDate).toLocaleDateString(),
-          },
-          { header: "Producto Entrada", value: (row: ProductionEntryRow) => row.inputProductName },
-          { header: "Lote Entrada", value: (row: ProductionEntryRow) => row.inputLotNumber },
-          {
-            header: "Cantidad Consumida (kg)",
-            value: (row: ProductionEntryRow) =>
-              formatNumber(
-                convertFromCanonical(
-                  row.quantityConsumed.value,
-                  row.quantityConsumed.unit as WeightUnit,
-                ),
-              ),
-          },
-          { header: "No. Salidas", value: (row: ProductionEntryRow) => row.outputsCount },
-        ]
-      : [
-          {
-            header: "Fecha",
-            value: (row: FlatProductionHistoryRow) =>
-              new Date(row.runDate).toLocaleDateString(),
-          },
-          { header: "Producto Entrada", value: (row: FlatProductionHistoryRow) => row.inputProductName },
-          { header: "Lote Entrada", value: (row: FlatProductionHistoryRow) => row.inputLotNumber },
-          {
-            header: "Cantidad Consumida (kg)",
-            value: (row: FlatProductionHistoryRow) =>
-              formatNumber(
-                convertFromCanonical(
-                  row.quantityConsumed.value,
-                  row.quantityConsumed.unit as WeightUnit,
-                ),
-              ),
-          },
-          { header: "Producto Salida", value: (row: FlatProductionHistoryRow) => row.outputProduct },
-          {
-            header: "Cantidad Producida (kg)",
-            value: (row: FlatProductionHistoryRow) =>
-              formatNumber(
-                convertFromCanonical(
-                  row.quantityProduced.value,
-                  row.quantityProduced.unit as WeightUnit,
-                ),
-              ),
-          },
-          { header: "Nuevo Lote", value: (row: FlatProductionHistoryRow) => row.newLotNumber },
-          {
-            header: "Factores de Calidad",
-            value: (row: FlatProductionHistoryRow) =>
-              row.qualityFactors.length > 0
-                ? row.qualityFactors.map((factor) => `${factor.name}: ${factor.value}`).join(" | ")
-                : "N/A",
-          },
-        ];
+  const entryExportColumns: ExportColumn<ProductionEntryRow>[] = [
+    {
+      header: "Fecha",
+      value: (row) => new Date(row.runDate).toLocaleDateString(),
+    },
+    { header: "Producto Entrada", value: (row) => row.inputProductName },
+    { header: "Lote Entrada", value: (row) => row.inputLotNumber },
+    {
+      header: "Cantidad Consumida (kg)",
+      value: (row) =>
+        formatNumber(
+          convertFromCanonical(
+            row.quantityConsumed.value,
+            row.quantityConsumed.unit as WeightUnit,
+          ),
+        ),
+    },
+    { header: "No. Salidas", value: (row) => row.outputsCount },
+  ];
+
+  const outputExportColumns: ExportColumn<FlatProductionHistoryRow>[] = [
+    {
+      header: "Fecha",
+      value: (row) => new Date(row.runDate).toLocaleDateString(),
+    },
+    { header: "Producto Entrada", value: (row) => row.inputProductName },
+    { header: "Lote Entrada", value: (row) => row.inputLotNumber },
+    {
+      header: "Cantidad Consumida (kg)",
+      value: (row) =>
+        formatNumber(
+          convertFromCanonical(
+            row.quantityConsumed.value,
+            row.quantityConsumed.unit as WeightUnit,
+          ),
+        ),
+    },
+    { header: "Producto Salida", value: (row) => row.outputProduct },
+    {
+      header: "Merma",
+      value: (row) => OUTPUT_TYPE_LABELS[row.outputType],
+    },
+    {
+      header: "Cantidad Producida (kg)",
+      value: (row) =>
+        formatNumber(
+          convertFromCanonical(
+            row.quantityProduced.value,
+            row.quantityProduced.unit as WeightUnit,
+          ),
+        ),
+    },
+    { header: "Nuevo Lote", value: (row) => row.newLotNumber },
+    {
+      header: "Factores de Calidad",
+      value: (row) =>
+        row.qualityFactors.length > 0
+          ? row.qualityFactors
+              .map((factor) => `${factor.name}: ${factor.value}`)
+              .join(" | ")
+          : "N/A",
+    },
+  ];
 
   return (
     <div className="mt-8 flow-root">
@@ -560,21 +599,23 @@ export default function ProductionHistoryTable() {
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
         />
-        <ExportActions
-          organizationId={orgId}
-          moduleName={
-            viewMode === "entries"
-              ? "historial_produccion_entradas"
-              : "historial_produccion_salidas"
-          }
-          fileBaseName={
-            viewMode === "entries"
-              ? "historial-produccion-entradas"
-              : "historial-produccion-salidas"
-          }
-          rows={exportRows as any[]}
-          columns={exportColumns as any}
-        />
+        {viewMode === "entries" ? (
+          <ExportActions
+            organizationId={orgId}
+            moduleName="historial_produccion_entradas"
+            fileBaseName="historial-produccion-entradas"
+            rows={entryData}
+            columns={entryExportColumns}
+          />
+        ) : (
+          <ExportActions
+            organizationId={orgId}
+            moduleName="historial_produccion_salidas"
+            fileBaseName="historial-produccion-salidas"
+            rows={outputData}
+            columns={outputExportColumns}
+          />
+        )}
       </div>
       {viewMode === "entries" ? (
         <ProductionHistoryDataTable table={entryTable} />
@@ -623,7 +664,228 @@ function ProductionHistoryDataTable<TData>({
   );
 }
 
-function EditProductionEntryDialog({
+function EditProductionRunEntryDialog({
+  entry,
+}: {
+  entry: ProductionEntryRow;
+}) {
+  const organization = useQuery(api.organizations.getOrg);
+  const orgId = organization?._id;
+  const producibleStock = useQuery(
+    api.inventory.getProducibleStock,
+    orgId ? { organizationId: orgId } : "skip",
+  );
+  const editProductionRunEntry = useMutation(api.production.editProductionRunEntry);
+
+  const [open, setOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string>(
+    entry.inputProductId ?? "",
+  );
+  const [selectedLotId, setSelectedLotId] = useState<string>(entry.inputLotId);
+  const [quantityConsumedKg, setQuantityConsumedKg] = useState<string>(
+    String(convertFromCanonical(entry.quantityConsumed.value, "kg")),
+  );
+  const [notes, setNotes] = useState(entry.notes ?? "");
+
+  useEffect(() => {
+    if (!open) return;
+    setSelectedProductId(entry.inputProductId ?? "");
+    setSelectedLotId(entry.inputLotId);
+    setQuantityConsumedKg(String(convertFromCanonical(entry.quantityConsumed.value, "kg")));
+    setNotes(entry.notes ?? "");
+  }, [entry, open]);
+
+  const productOptions = [...(producibleStock ?? [])];
+  if (
+    entry.inputProductId &&
+    !productOptions.some((product) => product._id === entry.inputProductId)
+  ) {
+    productOptions.unshift({
+      _id: entry.inputProductId,
+      name: entry.inputProductName,
+    } as (typeof productOptions)[number]);
+  }
+
+  const availableLots = useQuery(
+    api.inventory.getLotsForProduct,
+    selectedProductId && orgId
+      ? {
+          productId: selectedProductId as Id<"products">,
+          organizationId: orgId,
+          includeLotId:
+            selectedProductId === entry.inputProductId ? entry.inputLotId : undefined,
+        }
+      : "skip",
+  );
+
+  const selectedLot = availableLots?.find((lot) => lot._id === selectedLotId);
+  const isCurrentInputLot = selectedLot?._id === entry.inputLotId;
+  const sourceFieldsLocked = entry.outputsCount > 0;
+  const availableQuantity = selectedLot
+    ? isCurrentInputLot
+      ? selectedLot.quantity + entry.quantityConsumed.value
+      : selectedLot.quantity
+    : 0;
+  const disabledReason = !entry.inputProductId
+    ? "No se pudo identificar el producto de entrada."
+    : undefined;
+
+  const handleProductChange = (value: string) => {
+    setSelectedProductId(value);
+    setSelectedLotId(value === entry.inputProductId ? entry.inputLotId : "");
+  };
+
+  const handleSave = async () => {
+    if (!sourceFieldsLocked && (!selectedProductId || !selectedLotId)) {
+      toast.error("Debe seleccionar un producto y un lote de entrada.");
+      return;
+    }
+
+    const parsedConsumed = sourceFieldsLocked
+      ? convertFromCanonical(entry.quantityConsumed.value, "kg")
+      : Number(quantityConsumedKg);
+
+    if (!sourceFieldsLocked && (!Number.isFinite(parsedConsumed) || parsedConsumed <= 0)) {
+      toast.error("La cantidad consumida debe ser mayor que cero.");
+      return;
+    }
+
+    if (
+      !sourceFieldsLocked &&
+      (!selectedLot || convertToCanonical(parsedConsumed, "kg") > availableQuantity)
+    ) {
+      toast.error(
+        `La cantidad no puede ser mayor que la disponible (${formatNumber(
+          convertFromCanonical(availableQuantity, "kg"),
+        )} kg).`,
+      );
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await editProductionRunEntry({
+        productionRunId: entry.runId,
+        inputLotId: (sourceFieldsLocked ? entry.inputLotId : selectedLotId) as Id<"inventoryLots">,
+        quantityConsumed: convertToCanonical(parsedConsumed, "kg"),
+        notes: notes.trim() ? notes.trim() : undefined,
+      });
+      toast.success("Entrada de producción actualizada correctamente.");
+      setOpen(false);
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar la entrada de producción.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled={Boolean(disabledReason)}
+          title={disabledReason}
+        >
+          <SquarePen className="size-4 text-primary" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Modificar Entrada de Producción</DialogTitle>
+        </DialogHeader>
+        {sourceFieldsLocked && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Esta entrada ya tiene salidas registradas. Para proteger la trazabilidad,
+            producto, lote y cantidad consumida quedan bloqueados. Solo puedes editar
+            las notas.
+          </div>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <p className="text-sm mb-2">Producto de Entrada</p>
+            <Select
+              value={selectedProductId}
+              onValueChange={handleProductChange}
+              disabled={sourceFieldsLocked}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccione un producto..." />
+              </SelectTrigger>
+              <SelectContent>
+                {productOptions.map((product) => (
+                  <SelectItem key={product._id} value={product._id}>
+                    {product.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <p className="text-sm mb-2">No Tiquete</p>
+            <Select
+              value={selectedLotId}
+              onValueChange={setSelectedLotId}
+              disabled={sourceFieldsLocked}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={!availableLots ? "Cargando..." : "Seleccione un lote..."}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {(availableLots ?? []).map((lot) => {
+                  const lotAvailableQuantity =
+                    lot._id === entry.inputLotId
+                      ? lot.quantity + entry.quantityConsumed.value
+                      : lot.quantity;
+                  return (
+                    <SelectItem key={lot._id} value={lot._id}>
+                      {`${lot.lotNumber} (Disp: ${formatNumber(
+                        convertFromCanonical(lotAvailableQuantity, "kg"),
+                      )} kg)`}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <p className="text-sm mb-2">Cant. Consumida (kg)</p>
+            <Input
+              type="number"
+              inputMode="decimal"
+              step="any"
+              value={quantityConsumedKg}
+              onChange={(e) => setQuantityConsumedKg(e.target.value)}
+              disabled={sourceFieldsLocked}
+            />
+          </div>
+          <div>
+            <p className="text-sm mb-2">Notas</p>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? "Guardando..." : "Guardar"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditProductionOutputDialog({
   entry,
   warehouses,
 }: {
@@ -674,8 +936,10 @@ function EditProductionEntryDialog({
       });
       toast.success("Producción actualizada correctamente.");
       setOpen(false);
-    } catch (error: any) {
-      toast.error(error?.message ?? "No se pudo actualizar la producción.");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error ? error.message : "No se pudo actualizar la producción.",
+      );
     } finally {
       setIsSaving(false);
     }

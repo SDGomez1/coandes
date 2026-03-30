@@ -18,10 +18,12 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type Row,
   SortingState,
   useReactTable,
 } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
+import type { DateRange } from "react-day-picker";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { convertFromCanonical, convertToCanonical } from "@/lib/units";
 import { Button } from "@/components/ui/button";
@@ -45,6 +47,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ExportActions } from "../exportaciones/ExportActions";
+import { DatePicker } from "@/components/ui/date-picker";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import {
+  formatDateLabel,
+  isDateInRange,
+  toLocalCalendarDate,
+  toLocalDayTimestamp,
+} from "@/lib/date";
 
 type DispatchHistoryRow = {
   _id: Id<"dispatchLineItems">;
@@ -61,6 +71,7 @@ type DispatchHistoryRow = {
   presentation?: string;
   equivalence?: string;
   averageWeight?: number;
+  qualityCharacteristics: { name: string; value: string }[];
 };
 
 const columnHelper = createColumnHelper<DispatchHistoryRow>();
@@ -99,6 +110,18 @@ function getEquivalentQuantity(row: DispatchHistoryRow) {
   return (row.quantityDispatched * equivalence) / averageWeight;
 }
 
+function formatQualityCharacteristics(
+  characteristics: { name: string; value: string }[],
+) {
+  if (characteristics.length === 0) {
+    return "N/A";
+  }
+
+  return characteristics
+    .map((characteristic) => `${characteristic.name}: ${characteristic.value}`)
+    .join(" | ");
+}
+
 export default function DispatchHistoryTable() {
   const organization = useQuery(api.organizations.getOrg);
   const orgId = organization?._id;
@@ -113,6 +136,15 @@ export default function DispatchHistoryTable() {
   );
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+
+  const filteredData = useMemo(
+    () =>
+      (data ?? []).filter((row) =>
+        isDateInRange(row.dispatchDate, dateRange?.from, dateRange?.to),
+      ),
+    [data, dateRange],
+  );
 
   const columns = useMemo(
     () => [
@@ -130,7 +162,7 @@ export default function DispatchHistoryTable() {
             )}
           </Button>
         ),
-        cell: (info) => new Date(info.getValue()).toLocaleDateString(),
+        cell: (info) => formatDateLabel(new Date(info.getValue())),
       }),
       columnHelper.accessor("customerName", {
         header: ({ column }) => (
@@ -197,6 +229,30 @@ export default function DispatchHistoryTable() {
         ),
         cell: (info) => info.getValue(),
       }),
+      columnHelper.accessor(
+        (row) => formatQualityCharacteristics(row.qualityCharacteristics),
+        {
+          id: "qualityCharacteristics",
+          header: "Características producción",
+          cell: ({ row }) => {
+            if (row.original.qualityCharacteristics.length === 0) {
+              return "N/A";
+            }
+
+            return (
+              <ul className="space-y-1 text-sm">
+                {row.original.qualityCharacteristics.map((characteristic) => (
+                  <li
+                    key={`${row.original._id}-${characteristic.name}-${characteristic.value}`}
+                  >
+                    {`${characteristic.name}: ${characteristic.value}`}
+                  </li>
+                ))}
+              </ul>
+            );
+          },
+        },
+      ),
       columnHelper.accessor("quantityDispatched", {
         id: "quantity",
         header: ({ column }) => (
@@ -269,7 +325,7 @@ export default function DispatchHistoryTable() {
   );
 
   const table = useReactTable({
-    data: data ?? [],
+    data: filteredData,
     columns,
     state: {
       sorting,
@@ -284,7 +340,7 @@ export default function DispatchHistoryTable() {
         .replace(/[\u0300-\u036f]/g, "");
 
       const cols = table.getAllLeafColumns();
-      const searchInRow = (tableRow: any) => {
+      const searchInRow = (tableRow: Row<DispatchHistoryRow>) => {
         for (const column of cols) {
           const cellValue = tableRow.getValue(column.id);
           if (cellValue) {
@@ -333,44 +389,97 @@ export default function DispatchHistoryTable() {
     );
   }
 
+  if (filteredData.length === 0) {
+    return (
+      <div className="mt-8 flow-root">
+        <div className="flex flex-col gap-4 mb-4 xl:flex-row xl:items-center xl:justify-between">
+          <Input
+            placeholder="Buscar por item, proveedor o tiquete..."
+            value={globalFilter ?? ""}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            className="max-w-lg"
+          />
+          <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+            <DateRangePicker value={dateRange} onChange={setDateRange} />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDateRange(undefined)}
+              disabled={!dateRange?.from}
+            >
+              Limpiar fechas
+            </Button>
+          </div>
+        </div>
+        <div className="w-full mt-8 p-6 flex justify-center items-center border rounded-lg shadow-sm">
+          <p className="text-sm text-gray-500">
+            No hay despachos para el rango seleccionado.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-8 flow-root">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-4 mb-4 xl:flex-row xl:items-center xl:justify-between">
         <Input
           placeholder="Buscar por item, proveedor o tiquete..."
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
         />
-        <ExportActions
-          organizationId={orgId}
-          moduleName="historial_despachos"
-          fileBaseName="historial-despachos"
-          rows={data}
-          columns={[
-            {
-              header: "Fecha Despacho",
-              value: (row) => new Date(row.dispatchDate).toLocaleDateString(),
-            },
-            { header: "Cliente", value: (row) => row.customerName },
-            { header: "No. Tiquete", value: (row) => row.lotNumber },
-            { header: "No. Tiquete Despacho", value: (row) => row.lotNumberDispatch },
-            { header: "Producto", value: (row) => row.productName },
-            {
-              header: "Cantidad (kg)",
-              value: (row) => formatNumber(convertFromCanonical(row.quantityDispatched, "kg")),
-            },
-            {
-              header: "Equivalencia",
-              value: (row) => {
-                const eq = getEquivalentQuantity(row);
-                if (eq === null) return "N/A";
-                const label = getPresentationLabel(row.presentation, eq);
-                return label ? `${formatNumber(eq)} ${label}` : "N/A";
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center">
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDateRange(undefined)}
+            disabled={!dateRange?.from}
+          >
+            Limpiar fechas
+          </Button>
+          <ExportActions
+            organizationId={orgId}
+            moduleName="historial_despachos"
+            fileBaseName="historial-despachos"
+            rows={filteredData}
+            columns={[
+              {
+                header: "Fecha Despacho",
+                value: (row) => formatDateLabel(new Date(row.dispatchDate)),
               },
-            },
-          ]}
-        />
+              { header: "Cliente", value: (row) => row.customerName },
+              { header: "No. Tiquete", value: (row) => row.lotNumber },
+              {
+                header: "No. Tiquete Despacho",
+                value: (row) => row.lotNumberDispatch,
+              },
+              { header: "Producto", value: (row) => row.productName },
+              {
+                header: "Características Producción",
+                value: (row) =>
+                  formatQualityCharacteristics(row.qualityCharacteristics),
+              },
+              {
+                header: "Cantidad (kg)",
+                value: (row) =>
+                  formatNumber(
+                    convertFromCanonical(row.quantityDispatched, "kg"),
+                  ),
+              },
+              {
+                header: "Equivalencia",
+                value: (row) => {
+                  const eq = getEquivalentQuantity(row);
+                  if (eq === null) return "N/A";
+                  const label = getPresentationLabel(row.presentation, eq);
+                  return label ? `${formatNumber(eq)} ${label}` : "N/A";
+                },
+              },
+            ]}
+          />
+        </div>
       </div>
       <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">
         <Table>
@@ -416,6 +525,7 @@ function EditDispatchEntryDialog({
   customers: Array<{ _id: Id<"customers">; name: string }>;
 }) {
   const editDispatchEntry = useMutation(api.dispatches.editDispatchEntry);
+  const today = toLocalCalendarDate(new Date());
 
   const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -424,9 +534,16 @@ function EditDispatchEntryDialog({
     String(convertFromCanonical(entry.quantityDispatched, "kg")),
   );
   const [customerId, setCustomerId] = useState<string>(entry.customerId ?? "none");
-  const [dispatchDate, setDispatchDate] = useState(
-    new Date(entry.dispatchDate).toISOString().slice(0, 10),
+  const [dispatchDate, setDispatchDate] = useState<Date | undefined>(
+    toLocalCalendarDate(new Date(entry.dispatchDate)),
   );
+
+  const resetState = () => {
+    setTicketNumber(entry.lotNumberDispatch);
+    setQuantityKg(String(convertFromCanonical(entry.quantityDispatched, "kg")));
+    setCustomerId(entry.customerId ?? "none");
+    setDispatchDate(toLocalCalendarDate(new Date(entry.dispatchDate)));
+  };
 
   const handleSave = async () => {
     const parsedQuantity = Number(quantityKg);
@@ -435,8 +552,7 @@ function EditDispatchEntryDialog({
       return;
     }
 
-    const parsedDate = new Date(dispatchDate);
-    if (Number.isNaN(parsedDate.getTime())) {
+    if (!dispatchDate) {
       toast.error("La fecha de despacho es inválida.");
       return;
     }
@@ -449,19 +565,31 @@ function EditDispatchEntryDialog({
         quantityDispatched: convertToCanonical(parsedQuantity, "kg"),
         customerId:
           customerId === "none" ? undefined : (customerId as Id<"customers">),
-        dispatchDate: parsedDate.getTime(),
+        dispatchDate: toLocalDayTimestamp(dispatchDate),
       });
       toast.success("Despacho actualizado correctamente.");
       setOpen(false);
-    } catch (error: any) {
-      toast.error(error?.message ?? "No se pudo actualizar el despacho.");
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo actualizar el despacho.",
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen) {
+          resetState();
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon">
           <SquarePen className="size-4 text-primary" />
@@ -491,10 +619,11 @@ function EditDispatchEntryDialog({
           </div>
           <div>
             <p className="text-sm mb-2">Fecha</p>
-            <Input
-              type="date"
+            <DatePicker
               value={dispatchDate}
-              onChange={(e) => setDispatchDate(e.target.value)}
+              onChange={setDispatchDate}
+              placeholder="Seleccione una fecha"
+              disabled={(date) => toLocalCalendarDate(date) > today}
             />
           </div>
           <div>

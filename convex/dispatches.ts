@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { getProductionCharacteristicsForLot } from "./lotCharacteristics";
 
 /**
  * Creates a dispatch (sale), consuming inventory lots.
@@ -26,16 +27,29 @@ export const createDispatch = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    // 1. Create the main dispatch record
-    const dispatchId = await ctx.db.insert("dispatches", {
-      organizationId: args.organizationId,
-      customerId: args.customerId,
-      dispatchDate: args.dispatchDate,
-      status: "Shipped",
-    });
+    if (args.items.length === 0) {
+      throw new Error("Dispatch must include at least one line item.");
+    }
 
-    // 2. Process each item in the dispatch
+    const seenLotIds = new Set<string>();
+    const validatedItems = [];
+
     for (const item of args.items) {
+      if (item.quantityDispatched <= 0) {
+        throw new Error("Each dispatched quantity must be greater than zero.");
+      }
+
+      const cleanedTicketNumber = item.ticketNumber.trim();
+      if (!cleanedTicketNumber) {
+        throw new Error("Dispatch ticket number is required.");
+      }
+
+      const lotId = item.inventoryLotId.toString();
+      if (seenLotIds.has(lotId)) {
+        throw new Error("A dispatch cannot include the same source lot twice.");
+      }
+      seenLotIds.add(lotId);
+
       const lot = await ctx.db.get(item.inventoryLotId);
       if (!lot) {
         throw new Error(
@@ -51,20 +65,40 @@ export const createDispatch = mutation({
         );
       }
 
-      // Create a line item for the dispatch
+      const qualitySnapshot = await getProductionCharacteristicsForLot(
+        ctx.db,
+        lot,
+      );
+
+      validatedItems.push({
+        inventoryLotId: item.inventoryLotId,
+        quantityDispatched: item.quantityDispatched,
+        ticketNumber: cleanedTicketNumber,
+        qualitySnapshot,
+        lot,
+      });
+    }
+
+    const dispatchId = await ctx.db.insert("dispatches", {
+      organizationId: args.organizationId,
+      customerId: args.customerId,
+      dispatchDate: args.dispatchDate,
+      status: "Shipped",
+    });
+
+    for (const item of validatedItems) {
       await ctx.db.insert("dispatchLineItems", {
-        dispatchId: dispatchId,
+        dispatchId,
         inventoryLotId: item.inventoryLotId,
         quantityDispatched: item.quantityDispatched,
         ticketNumber: item.ticketNumber,
+        qualitySnapshot: item.qualitySnapshot,
       });
 
-      // Decrement the lot quantity
       await ctx.db.patch(item.inventoryLotId, {
-        quantity: lot.quantity - item.quantityDispatched,
+        quantity: item.lot.quantity - item.quantityDispatched,
       });
 
-      // Log the dispatch activity
       await ctx.db.insert("activityLog", {
         organizationId: args.organizationId,
         inventoryLotId: item.inventoryLotId,
@@ -193,6 +227,11 @@ export const getDispatchHistory = query({
       for (const item of lineItems) {
         const lot = await ctx.db.get(item.inventoryLotId);
         const product = lot ? await ctx.db.get(lot.productId) : null;
+        const qualityCharacteristics =
+          item.qualitySnapshot ??
+          (lot
+            ? await getProductionCharacteristicsForLot(ctx.db, lot)
+            : []);
 
         history.push({
           _id: item._id,
@@ -209,6 +248,7 @@ export const getDispatchHistory = query({
           presentation: product?.presentation ?? "",
           equivalence: product?.equivalence ?? "",
           averageWeight: product?.averageWeight ?? 0,
+          qualityCharacteristics,
         });
       }
     }

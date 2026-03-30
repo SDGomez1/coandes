@@ -2,6 +2,54 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 
+type ProductionOutputType = "standard" | "merma";
+
+function normalizeOutputType(outputType?: ProductionOutputType) {
+  return outputType ?? "standard";
+}
+
+async function resolveConfiguredOutputs(
+  ctx: any,
+  inputProductId: Id<"products">,
+  outputs: Array<{
+    productId: Id<"products">;
+    quantityProduced: number;
+    lotNumber: string;
+    warehouseId: Id<"warehouse">;
+    outputType?: ProductionOutputType;
+    qualityFactors: Array<{
+      factorId: Id<"qualityFactors">;
+      value: string;
+    }>;
+  }>,
+) {
+  if (outputs.length === 0) {
+    return [];
+  }
+
+  const definitions = await ctx.db
+    .query("productOutputDefinitions")
+    .withIndex("by_input", (q: any) => q.eq("inputProductId", inputProductId))
+    .collect();
+
+  const allowedOutputProductIds = new Set<string>(
+    definitions.map((definition: any) => definition.outputProductId),
+  );
+
+  return outputs.map((output) => {
+    if (!allowedOutputProductIds.has(output.productId)) {
+      throw new Error(
+        "One of the output products is not configured for this production input.",
+      );
+    }
+
+    return {
+      ...output,
+      outputType: normalizeOutputType(output.outputType),
+    };
+  });
+}
+
 export const createProductionRun = mutation({
   args: {
     organizationId: v.id("organizations"),
@@ -14,6 +62,9 @@ export const createProductionRun = mutation({
         quantityProduced: v.number(),
         lotNumber: v.string(),
         warehouseId: v.id("warehouse"),
+        outputType: v.optional(
+          v.union(v.literal("standard"), v.literal("merma")),
+        ),
         qualityFactors: v.array(
           v.object({
             factorId: v.id("qualityFactors"),
@@ -36,10 +87,20 @@ export const createProductionRun = mutation({
         `Insufficient quantity. Available: ${inputLot.quantity}, Required: ${args.quantityConsumed}`,
       );
     }
-    for (const output of args.outputs) {
+    const resolvedOutputs = await resolveConfiguredOutputs(
+      ctx,
+      inputLot.productId,
+      args.outputs,
+    );
+
+    for (const output of resolvedOutputs) {
       const product = await ctx.db.get(output.productId);
       if (!product) {
         throw new Error(`Product with id ${output.productId} not found`);
+      }
+      const warehouse = await ctx.db.get(output.warehouseId);
+      if (!warehouse || warehouse.organizationId !== args.organizationId) {
+        throw new Error("Warehouse not found or access denied.");
       }
       if (output.lotNumber) {
         const existingLot = await ctx.db
@@ -79,7 +140,7 @@ export const createProductionRun = mutation({
     });
 
     // 6. Process all outputs
-    for (const output of args.outputs) {
+    for (const output of resolvedOutputs) {
       const product = await ctx.db.get(output.productId);
       if (!product) {
         throw new Error(`Product with id ${output.productId} not found`);
@@ -116,6 +177,7 @@ export const createProductionRun = mutation({
         productId: output.productId,
         quantityProduced: output.quantityProduced,
         resultingInventoryLotId: resultingInventoryLotId,
+        outputType: output.outputType,
       });
 
       if (output.qualityFactors && output.qualityFactors.length > 0) {
@@ -130,6 +192,123 @@ export const createProductionRun = mutation({
     }
 
     return productionRunId;
+  },
+});
+
+export const editProductionRunEntry = mutation({
+  args: {
+    productionRunId: v.id("productionRuns"),
+    inputLotId: v.id("inventoryLots"),
+    quantityConsumed: v.number(),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    if (args.quantityConsumed <= 0) {
+      throw new Error("La cantidad consumida debe ser mayor que cero.");
+    }
+
+    const run = await ctx.db.get(args.productionRunId);
+    if (!run) {
+      throw new Error("Production run not found.");
+    }
+
+    const outputs = await ctx.db
+      .query("productionOutputs")
+      .withIndex("by_run", (q) => q.eq("productionRunId", run._id))
+      .collect();
+
+    if (outputs.length > 0) {
+      if (
+        args.inputLotId !== run.inputLotId ||
+        args.quantityConsumed !== run.quantityConsumed
+      ) {
+        throw new Error(
+          "Esta entrada ya tiene salidas registradas. Solo se pueden editar las notas para proteger la trazabilidad.",
+        );
+      }
+
+      await ctx.db.patch(run._id, {
+        notes: args.notes,
+      });
+      return;
+    }
+
+    const currentInputLot = await ctx.db.get(run.inputLotId);
+    const nextInputLot = await ctx.db.get(args.inputLotId);
+
+    if (!currentInputLot || !nextInputLot) {
+      throw new Error("Related inventory lot not found.");
+    }
+
+    if (nextInputLot.organizationId !== run.organizationId) {
+      throw new Error("Access denied to input lot.");
+    }
+
+    const isSameLot = currentInputLot._id === nextInputLot._id;
+    const availableBeforeEdit = isSameLot
+      ? currentInputLot.quantity + run.quantityConsumed
+      : nextInputLot.quantity;
+
+    if (args.quantityConsumed > availableBeforeEdit) {
+      throw new Error(
+        `Insufficient input lot quantity. Available: ${availableBeforeEdit}, Required: ${args.quantityConsumed}`,
+      );
+    }
+
+    if (isSameLot) {
+      await ctx.db.patch(currentInputLot._id, {
+        quantity:
+          currentInputLot.quantity +
+          run.quantityConsumed -
+          args.quantityConsumed,
+      });
+    } else {
+      await ctx.db.patch(currentInputLot._id, {
+        quantity: currentInputLot.quantity + run.quantityConsumed,
+      });
+      await ctx.db.patch(nextInputLot._id, {
+        quantity: nextInputLot.quantity - args.quantityConsumed,
+      });
+    }
+
+    await ctx.db.patch(run._id, {
+      inputLotId: args.inputLotId,
+      quantityConsumed: args.quantityConsumed,
+      notes: args.notes,
+    });
+
+    if (isSameLot) {
+      const inputDelta = run.quantityConsumed - args.quantityConsumed;
+      if (inputDelta !== 0) {
+        await ctx.db.insert("activityLog", {
+          organizationId: run.organizationId,
+          inventoryLotId: currentInputLot._id,
+          activityType: "adjustment",
+          quantityChange: inputDelta,
+          relatedId: run._id,
+          timestamp: Date.now(),
+        });
+      }
+      return;
+    }
+
+    await ctx.db.insert("activityLog", {
+      organizationId: run.organizationId,
+      inventoryLotId: currentInputLot._id,
+      activityType: "adjustment",
+      quantityChange: run.quantityConsumed,
+      relatedId: run._id,
+      timestamp: Date.now(),
+    });
+
+    await ctx.db.insert("activityLog", {
+      organizationId: run.organizationId,
+      inventoryLotId: nextInputLot._id,
+      activityType: "adjustment",
+      quantityChange: -args.quantityConsumed,
+      relatedId: run._id,
+      timestamp: Date.now(),
+    });
   },
 });
 
@@ -260,6 +439,9 @@ export const addOutputsToProductionRun = mutation({
         quantityProduced: v.number(),
         lotNumber: v.string(),
         warehouseId: v.id("warehouse"),
+        outputType: v.optional(
+          v.union(v.literal("standard"), v.literal("merma")),
+        ),
         qualityFactors: v.array(
           v.object({
             factorId: v.id("qualityFactors"),
@@ -275,7 +457,18 @@ export const addOutputsToProductionRun = mutation({
       throw new Error("Production run not found.");
     }
 
-    for (const output of args.outputs) {
+    const inputLot = await ctx.db.get(run.inputLotId);
+    if (!inputLot) {
+      throw new Error("Input inventory lot not found.");
+    }
+
+    const resolvedOutputs = await resolveConfiguredOutputs(
+      ctx,
+      inputLot.productId,
+      args.outputs,
+    );
+
+    for (const output of resolvedOutputs) {
       if (output.quantityProduced <= 0) {
         throw new Error("Produced quantity must be greater than zero.");
       }
@@ -330,6 +523,7 @@ export const addOutputsToProductionRun = mutation({
         productId: output.productId,
         quantityProduced: output.quantityProduced,
         resultingInventoryLotId,
+        outputType: output.outputType,
       });
 
       for (const qf of output.qualityFactors) {
@@ -432,6 +626,7 @@ export const getProductionHistory = query({
               productId: output.productId,
               quantityProduced: output.quantityProduced,
               resultingInventoryLotId: output.resultingInventoryLotId,
+              outputType: normalizeOutputType(output.outputType),
               warehouseId: lot?.warehouseId,
               newLotNumber: lot?.lotNumber ?? "N/A (By-product)",
               unit: product?.baseUnit ?? "",
@@ -444,10 +639,12 @@ export const getProductionHistory = query({
           _id: run._id,
           inputLotId: run.inputLotId,
           runDate: run.runDate,
+          inputProductId: inputLot?.productId,
           inputProductName: inputProduct?.name ?? "N/A",
           inputLotNumber: inputLot?.lotNumber ?? "N/A",
           quantityConsumed: run.quantityConsumed,
           inputUnit: inputProduct?.baseUnit ?? "",
+          notes: run.notes,
           outputs: outputDetails,
         };
       }),

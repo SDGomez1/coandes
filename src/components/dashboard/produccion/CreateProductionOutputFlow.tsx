@@ -16,6 +16,7 @@ import {
   FormItem,
   FormLabel,
 } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -28,11 +29,17 @@ import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { PlusIcon } from "lucide-react";
 import { convertToCanonical } from "@/lib/units";
 
+type PossibleOutput = {
+  _id: Id<"products">;
+  name: string;
+};
+
 const outputSchema = z.object({
   productId: z.string().min(1),
   quantityProduced: z.number().positive(),
   lotNumber: z.string().min(1, "El número de lote es obligatorio."),
   warehouseId: z.string().min(1, "Debe seleccionar una bodega."),
+  isMerma: z.boolean().default(false),
   qualityFactors: z.array(
     z.object({
       factorId: z.string(),
@@ -46,7 +53,8 @@ const formSchema = z.object({
   outputs: z.array(outputSchema).min(1, "Debe agregar al menos una salida."),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+type FormInputValues = z.input<typeof formSchema>;
+type FormValues = z.output<typeof formSchema>;
 
 export default function CreateProductionOutputFlow() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,7 +80,7 @@ export default function CreateProductionOutputFlow() {
     (api as any).production.addOutputsToProductionRun,
   );
 
-  const form = useForm<FormValues>({
+  const form = useForm<FormInputValues, unknown, FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       productionRunId: "",
@@ -101,7 +109,7 @@ export default function CreateProductionOutputFlow() {
     selectedRun?.inputProductId
       ? { inputProductId: selectedRun.inputProductId }
       : "skip",
-  );
+  ) as PossibleOutput[] | undefined;
 
   const handleAddOutput = () => {
     if (!possibleOutputs || possibleOutputs.length === 0) {
@@ -122,6 +130,7 @@ export default function CreateProductionOutputFlow() {
       quantityProduced: 0,
       lotNumber: suggestedLotNumber,
       warehouseId: warehouses?.[0]?._id ?? "",
+      isMerma: false,
       qualityFactors: [],
     });
   };
@@ -136,6 +145,7 @@ export default function CreateProductionOutputFlow() {
           quantityProduced: convertToCanonical(o.quantityProduced, "kg"),
           lotNumber: o.lotNumber,
           warehouseId: o.warehouseId as Id<"warehouse">,
+          outputType: o.isMerma ? "merma" : "standard",
           qualityFactors: o.qualityFactors.map((qf) => ({
             factorId: qf.factorId as Id<"qualityFactors">,
             value: qf.value,
@@ -260,14 +270,14 @@ function OutputCard({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Producto</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccione un producto de salida..." />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {possibleOutputs.map((p: any) => (
+                  {possibleOutputs.map((p: PossibleOutput) => (
                     <SelectItem key={p._id} value={p._id}>
                       {p.name}
                     </SelectItem>
@@ -278,6 +288,22 @@ function OutputCard({
           )}
         />
       </div>
+
+      <FormField
+        control={form.control}
+        name={`outputs.${index}.isMerma`}
+        render={({ field }) => (
+          <FormItem className="flex flex-row items-center gap-3 space-y-0 md:col-span-3">
+            <FormControl>
+              <Checkbox
+                checked={field.value}
+                onCheckedChange={(checked) => field.onChange(!!checked)}
+              />
+            </FormControl>
+            <FormLabel className="font-normal">Merma</FormLabel>
+          </FormItem>
+        )}
+      />
 
       <FormField
         control={form.control}
@@ -315,7 +341,7 @@ function OutputCard({
         render={({ field }) => (
           <FormItem>
             <FormLabel>Bodega</FormLabel>
-            <Select onValueChange={field.onChange} defaultValue={field.value}>
+            <Select onValueChange={field.onChange} value={field.value}>
               <FormControl>
                 <SelectTrigger>
                   <SelectValue placeholder="Bodega..." />

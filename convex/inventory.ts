@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { getProductionCharacteristicsForLot } from "./lotCharacteristics";
 
 /**
  * Fetches all active inventory lots in a specific warehouse.
@@ -102,14 +103,42 @@ export const getLotsForProduct = query({
   args: {
     productId: v.id("products"),
     organizationId: v.id("organizations"),
+    includeLotId: v.optional(v.id("inventoryLots")),
   },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const lots = await ctx.db
       .query("inventoryLots")
       .withIndex("by_product", (q) => q.eq("productId", args.productId))
       .filter((q) => q.eq(q.field("organizationId"), args.organizationId))
       .filter((q) => q.gt(q.field("quantity"), 0)) // Only active lots
       .collect();
+
+    const includedLot = args.includeLotId
+      ? await ctx.db.get(args.includeLotId)
+      : null;
+    const lotsToReturn =
+      includedLot &&
+      includedLot.productId === args.productId &&
+      includedLot.organizationId === args.organizationId &&
+      !lots.some((lot) => lot._id === includedLot._id)
+        ? [includedLot, ...lots]
+        : lots;
+    const sortedLots = [...lotsToReturn].sort((leftLot, rightLot) => {
+      if (leftLot.creationDate !== rightLot.creationDate) {
+        return leftLot.creationDate - rightLot.creationDate;
+      }
+      return leftLot.lotNumber.localeCompare(rightLot.lotNumber);
+    });
+
+    return await Promise.all(
+      sortedLots.map(async (lot) => ({
+        ...lot,
+        productionCharacteristics: await getProductionCharacteristicsForLot(
+          ctx.db,
+          lot,
+        ),
+      })),
+    );
   },
 });
 

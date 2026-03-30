@@ -121,7 +121,7 @@ export default function EditProduct({ product }: EditProductProps) {
         equivalence: product.equivalence,
         averageWeight: convertFromCanonical(product.averageWeight, product.baseUnit),
         qualityFactorsId: product.qualityFactorsId as string[],
-        outputProductIds: possibleOutputs.map((p) => p!._id),
+        outputProductIds: possibleOutputs.map((possibleOutput) => possibleOutput._id),
       });
     }
   }, [product, form, possibleOutputs]);
@@ -192,8 +192,8 @@ export default function EditProduct({ product }: EditProductProps) {
 
                     if (
                       data.outputProductIds &&
-                      (product.type === "Raw Material" ||
-                        product.type === "By-product")
+                      (data.type === "Raw Material" ||
+                        data.type === "By-product")
                     ) {
                       await updateProductOutputs({
                         productId: product._id,
@@ -411,7 +411,7 @@ export default function EditProduct({ product }: EditProductProps) {
                   <FormField
                     control={form.control}
                     name="outputProductIds"
-                    render={({ field }) => (
+                    render={() => (
                       <FormItem>
                         <div className="mb-4">
                           <FormLabel className="text-base">
@@ -426,10 +426,10 @@ export default function EditProduct({ product }: EditProductProps) {
                           {allProducts === undefined && <LoadingSpinner />}
                           {allProducts &&
                             allProducts.filter(
-                              (p) =>
-                                p._id !== product._id &&
-                                (p.type === "Finished Good" ||
-                                  p.type === "By-product"),
+                              (candidateProduct) =>
+                                candidateProduct._id !== product._id &&
+                                (candidateProduct.type === "Finished Good" ||
+                                  candidateProduct.type === "By-product"),
                             ).length === 0 && (
                               <p className="text-sm text-muted-foreground">
                                 No hay Subproductos o Productos Terminados
@@ -438,45 +438,50 @@ export default function EditProduct({ product }: EditProductProps) {
                             )}
                           {allProducts
                             ?.filter(
-                              (p) =>
-                                p._id !== product._id &&
-                                (p.type === "Finished Good" ||
-                                  p.type === "By-product"),
+                              (candidateProduct) =>
+                                candidateProduct._id !== product._id &&
+                                (candidateProduct.type === "Finished Good" ||
+                                  candidateProduct.type === "By-product"),
                             )
-                            .map((p) => (
+                            .map((candidateProduct) => (
                               <FormField
-                                key={p._id}
+                                key={candidateProduct._id}
                                 control={form.control}
                                 name="outputProductIds"
-                                render={({ field }) => {
-                                  return (
-                                    <FormItem
-                                      key={p._id}
-                                      className="flex flex-row items-start space-x-3 space-y-0"
-                                    >
-                                      <FormControl>
-                                        <Checkbox
-                                          checked={field.value?.includes(p._id)}
-                                          onCheckedChange={(checked) => {
-                                            return checked
-                                              ? field.onChange([
-                                                  ...(field.value ?? []),
-                                                  p._id,
-                                                ])
-                                              : field.onChange(
-                                                  field.value?.filter(
-                                                    (value) => value !== p._id,
-                                                  ),
-                                                );
-                                          }}
-                                        />
-                                      </FormControl>
-                                      <FormLabel className="font-normal">
-                                        {p.name} ({p.type})
-                                      </FormLabel>
-                                    </FormItem>
-                                  );
-                                }}
+                                render={({ field }) => (
+                                  <FormItem
+                                    key={candidateProduct._id}
+                                    className="flex flex-row items-start space-x-3 space-y-0"
+                                  >
+                                    <FormControl>
+                                      <Checkbox
+                                        checked={field.value?.includes(
+                                          candidateProduct._id,
+                                        )}
+                                        onCheckedChange={(checked) => {
+                                          return checked
+                                            ? field.onChange([
+                                                ...(field.value ?? []),
+                                                candidateProduct._id,
+                                              ])
+                                            : field.onChange(
+                                                field.value?.filter(
+                                                  (value) =>
+                                                    value !== candidateProduct._id,
+                                                ),
+                                              );
+                                        }}
+                                      />
+                                    </FormControl>
+                                    <FormLabel className="font-normal">
+                                      {candidateProduct.name} (
+                                      {candidateProduct.type === "By-product"
+                                        ? "Subproducto"
+                                        : "Producto terminado"}
+                                      )
+                                    </FormLabel>
+                                  </FormItem>
+                                )}
                               />
                             ))}
                         </div>

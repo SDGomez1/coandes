@@ -14,6 +14,7 @@ import {
   Tags,
   History,
   FileDown,
+  UserRound,
 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -81,6 +82,11 @@ export const creationLinks = [
     title: "Gestión de Proveedores",
     route: "/dashboard/creacion-proveedores",
     icon: BaggageClaim,
+  },
+  {
+    title: "Gestión de Clientes",
+    route: "/dashboard/creacion-clientes",
+    icon: UserRound,
   },
 ];
 

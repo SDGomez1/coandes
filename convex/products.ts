@@ -118,13 +118,14 @@ export const getPossibleOutputs = query({
       .withIndex("by_input", (q) => q.eq("inputProductId", args.inputProductId))
       .collect();
 
-    const outputProductIds = definitions.map((def) => def.outputProductId);
-
     const outputProducts = await Promise.all(
-      outputProductIds.map((id) => ctx.db.get(id)),
+      definitions.map((definition) => ctx.db.get(definition.outputProductId)),
     );
 
-    return outputProducts.filter((p) => p !== null);
+    return outputProducts.filter(
+      (product): product is NonNullable<(typeof outputProducts)[number]> =>
+        product !== null,
+    );
   },
 });
 
@@ -198,6 +199,11 @@ export const updateProductOutputs = mutation({
     organizationId: v.id("organizations"),
   },
   handler: async (ctx, args) => {
+    const product = await ctx.db.get(args.productId);
+    if (!product || product.organizationId !== args.organizationId) {
+      throw new Error("Input product not found or access denied.");
+    }
+
     // Clear existing definitions
     const existing = await ctx.db
       .query("productOutputDefinitions")
@@ -210,6 +216,14 @@ export const updateProductOutputs = mutation({
 
     // Create new definitions
     for (const outputId of args.outputProductIds) {
+      const outputProduct = await ctx.db.get(outputId);
+      if (
+        !outputProduct ||
+        outputProduct.organizationId !== args.organizationId
+      ) {
+        throw new Error("Output product not found or access denied.");
+      }
+
       await ctx.db.insert("productOutputDefinitions", {
         organizationId: args.organizationId,
         inputProductId: args.productId,

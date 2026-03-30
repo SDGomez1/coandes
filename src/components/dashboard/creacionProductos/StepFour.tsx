@@ -34,7 +34,7 @@ export default function StepFour() {
       <FormField
         control={control}
         name="outputProductIds"
-        render={({ field }) => (
+        render={() => (
           <FormItem>
             <div className="mb-4">
               <FormLabel className="text-base">Productos Resultantes</FormLabel>
@@ -44,7 +44,8 @@ export default function StepFour() {
               {products === undefined && <LoadingSpinner />}
               {products &&
                 products.filter(
-                  (p) => p.type === "Finished Good" || p.type === "By-product",
+                  (product) =>
+                    product.type === "Finished Good" || product.type === "By-product",
                 ).length === 0 && (
                   <p className="text-sm text-muted-foreground">
                     No hay Subproductos o Productos Terminados disponibles para
@@ -53,47 +54,45 @@ export default function StepFour() {
                 )}
               {products
                 ?.filter(
-                  (p) => p.type === "Finished Good" || p.type === "By-product",
+                  (product) =>
+                    product.type === "Finished Good" || product.type === "By-product",
                 )
                 .map((product) => (
                   <FormField
                     key={product._id}
                     control={control}
                     name="outputProductIds"
-                    render={({ field }) => {
-                      return (
-                        <FormItem
-                          key={product._id}
-                          className="flex flex-row items-start space-x-3 space-y-0"
-                        >
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value?.includes(product._id)}
-                              onCheckedChange={(checked) => {
-                                return checked
-                                  ? field.onChange([
-                                      ...(field.value ?? []),
-                                      product._id,
-                                    ])
-                                  : field.onChange(
-                                      field.value?.filter(
-                                        (value: string) =>
-                                          value !== product._id,
-                                      ),
-                                    );
-                              }}
-                            />
-                          </FormControl>
-                          <FormLabel className="font-normal">
-                            {product.name} (
-                            {product.type == "By-product"
-                              ? "Subproducto"
-                              : "Producto terminado"}
-                            )
-                          </FormLabel>
-                        </FormItem>
-                      );
-                    }}
+                    render={({ field }) => (
+                      <FormItem
+                        key={product._id}
+                        className="flex flex-row items-start space-x-3 space-y-0"
+                      >
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value?.includes(product._id)}
+                            onCheckedChange={(checked) => {
+                              return checked
+                                ? field.onChange([
+                                    ...(field.value ?? []),
+                                    product._id,
+                                  ])
+                                : field.onChange(
+                                    field.value?.filter(
+                                      (value: string) => value !== product._id,
+                                    ),
+                                  );
+                            }}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {product.name} (
+                          {product.type === "By-product"
+                            ? "Subproducto"
+                            : "Producto terminado"}
+                          )
+                        </FormLabel>
+                      </FormItem>
+                    )}
                   />
                 ))}
             </div>
