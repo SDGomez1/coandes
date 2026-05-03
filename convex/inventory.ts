@@ -142,6 +142,71 @@ export const getLotsForProduct = query({
   },
 });
 
+export const getLotsForDispatch = query({
+  args: {
+    organizationId: v.id("organizations"),
+    productType: v.union(
+      v.literal("Finished Good"),
+      v.literal("By-product"),
+    ),
+    productId: v.optional(v.id("products")),
+  },
+  handler: async (ctx, args) => {
+    let products = await ctx.db
+      .query("products")
+      .withIndex("by_org", (q) => q.eq("organizationId", args.organizationId))
+      .filter((q) => q.eq(q.field("type"), args.productType))
+      .collect();
+
+    if (args.productId) {
+      const selectedProduct = await ctx.db.get(args.productId);
+      if (!selectedProduct) {
+        throw new Error("Product not found.");
+      }
+      if (selectedProduct.organizationId !== args.organizationId) {
+        throw new Error("Access denied to selected product.");
+      }
+      if (selectedProduct.type !== args.productType) {
+        throw new Error("Selected product does not match the requested dispatch type.");
+      }
+
+      products = products.filter((product) => product._id === selectedProduct._id);
+    }
+
+    const lotsByProduct = await Promise.all(
+      products.map(async (product) => {
+        const activeLots = await ctx.db
+          .query("inventoryLots")
+          .withIndex("by_product", (q) => q.eq("productId", product._id))
+          .filter((q) => q.eq(q.field("organizationId"), args.organizationId))
+          .filter((q) => q.gt(q.field("quantity"), 0))
+          .collect();
+
+        return await Promise.all(
+          activeLots.map(async (lot) => ({
+            ...lot,
+            productName: product.name,
+            productType: product.type,
+            productionCharacteristics: await getProductionCharacteristicsForLot(
+              ctx.db,
+              lot,
+            ),
+          })),
+        );
+      }),
+    );
+
+    return lotsByProduct
+      .flat()
+      .sort((leftLot, rightLot) => {
+        if (leftLot.creationDate !== rightLot.creationDate) {
+          return leftLot.creationDate - rightLot.creationDate;
+        }
+        return leftLot.lotNumber.localeCompare(rightLot.lotNumber);
+      });
+  },
+});
+
 export const getProducibleStock = query({
   args: {
     organizationId: v.id("organizations"),
