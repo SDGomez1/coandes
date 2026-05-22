@@ -1,6 +1,5 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { paginationOptsValidator } from "convex/server";
 
 /**
  * Creates a new purchase order.
@@ -48,6 +47,7 @@ export const receivePurchase = mutation({
     vehicleInfo: v.string(),
     lotNumber: v.string(),
     quantity: v.number(),
+    receptionDate: v.number(),
     qualityFactorValues: v.optional(v.record(v.string(), v.string())),
   },
   handler: async (ctx, args) => {
@@ -76,7 +76,7 @@ export const receivePurchase = mutation({
       warehouseId: args.warehouseId,
       lotNumber: args.lotNumber,
       quantity: args.quantity,
-      creationDate: Date.now(),
+      creationDate: args.receptionDate,
       qualityFactorValues: args.qualityFactorValues,
       vehicleInfo: args.vehicleInfo,
       source: {
@@ -92,7 +92,7 @@ export const receivePurchase = mutation({
       activityType: "reception",
       quantityChange: args.quantity,
       relatedId: args.purchaseId,
-      timestamp: Date.now(),
+      timestamp: args.receptionDate,
     });
 
     // Update the purchase status
@@ -108,6 +108,7 @@ export const editPurchaseEntry = mutation({
     warehouseId: v.id("warehouse"),
     lotNumber: v.string(),
     quantity: v.number(),
+    receptionDate: v.number(),
     vehicleInfo: v.string(),
     supplierId: v.optional(v.id("suppliers")),
   },
@@ -171,11 +172,13 @@ export const editPurchaseEntry = mutation({
       warehouseId: args.warehouseId,
       lotNumber: args.lotNumber,
       quantity: args.quantity,
+      creationDate: args.receptionDate,
       vehicleInfo: args.vehicleInfo,
     });
 
     await ctx.db.patch(purchase._id, {
       supplierId: args.supplierId,
+      orderDate: args.receptionDate,
     });
 
     const quantityDelta = args.quantity - lot.quantity;
@@ -189,6 +192,62 @@ export const editPurchaseEntry = mutation({
         timestamp: Date.now(),
       });
     }
+  },
+});
+
+export const deletePurchaseEntry = mutation({
+  args: {
+    inventoryLotId: v.id("inventoryLots"),
+  },
+  handler: async (ctx, args) => {
+    const lot = await ctx.db.get(args.inventoryLotId);
+    if (!lot) {
+      throw new Error("Inventory lot not found.");
+    }
+    if (lot.source.type !== "purchase") {
+      throw new Error("Only purchase lots can be deleted from this flow.");
+    }
+
+    const purchase = await ctx.db.get(lot.source.purchaseId);
+    if (!purchase) {
+      throw new Error("Purchase not found.");
+    }
+
+    const lotActivity = await ctx.db
+      .query("activityLog")
+      .withIndex("by_lot", (q) => q.eq("inventoryLotId", lot._id))
+      .collect();
+
+    const hasLaterMovement = lotActivity.some((entry) => {
+      const isOwnReception =
+        entry.activityType === "reception" && entry.relatedId === purchase._id;
+      const isOwnPurchaseAdjustment =
+        entry.activityType === "adjustment" && entry.relatedId === purchase._id;
+
+      return !isOwnReception && !isOwnPurchaseAdjustment;
+    });
+
+    if (hasLaterMovement) {
+      throw new Error("No se puede borrar una compra con movimientos posteriores.");
+    }
+
+    const purchaseRecordedQuantity = await getPurchasedQuantityForLot(ctx, lot);
+    if (lot.quantity < purchaseRecordedQuantity) {
+      throw new Error("No se puede borrar una compra con movimientos posteriores.");
+    }
+
+    for (const entry of lotActivity) {
+      if (
+        entry.relatedId === purchase._id &&
+        (entry.activityType === "reception" ||
+          entry.activityType === "adjustment")
+      ) {
+        await ctx.db.delete(entry._id);
+      }
+    }
+
+    await ctx.db.delete(lot._id);
+    await ctx.db.delete(purchase._id);
   },
 });
 

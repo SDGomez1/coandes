@@ -29,6 +29,8 @@ import {
 } from "@/components/ui/select";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { convertFromCanonical, convertToCanonical } from "@/lib/units";
+import { DatePicker } from "@/components/ui/date-picker";
+import { toLocalCalendarDate, toLocalDayTimestamp } from "@/lib/date";
 
 const PrerequisitesMissing = ({ missing }: { missing: string[] }) => {
   const itemToPath: Record<string, string> = {
@@ -144,6 +146,7 @@ export default function PurchaseFlow() {
 
 const formSchema = z.object({
   productId: z.string().min(1, "Debe seleccionar un producto."),
+  receptionDate: z.date(),
   quantity: z.number().positive("La cantidad debe ser mayor que cero."),
   lotNumber: z.string().min(1, "El número de lote es obligatorio."),
   warehouseId: z.string().min(1, "Debe seleccionar una bodega."),
@@ -168,11 +171,13 @@ function PurchaseForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const createPurchase = useMutation(api.purchases.createPurchase);
   const receivePurchase = useMutation(api.purchases.receivePurchase);
+  const today = toLocalCalendarDate(new Date());
 
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       productId: "",
+      receptionDate: today,
       quantity: 0,
       lotNumber: ``,
       warehouseId: "",
@@ -219,10 +224,13 @@ function PurchaseForm({
         setIsSubmitting(false);
         return;
       }
+      const receptionDate = toLocalDayTimestamp(
+        data.receptionDate ?? toLocalCalendarDate(new Date()),
+      );
       const purchaseId = await createPurchase({
         organizationId: orgId,
         supplierId: data.supplierId as Id<"suppliers">,
-        orderDate: Date.now(),
+        orderDate: receptionDate,
       });
 
       await receivePurchase({
@@ -233,10 +241,20 @@ function PurchaseForm({
         quantity: purchaseWeightInGrams,
         qualityFactorValues: data.qualityFactors,
         vehicleInfo: data.vehicleInfo,
+        receptionDate,
       });
 
       toast.success("Compra registrada y recibida en inventario.");
-      form.reset();
+      form.reset({
+        productId: "",
+        receptionDate: toLocalCalendarDate(new Date()),
+        quantity: 0,
+        lotNumber: "",
+        warehouseId: "",
+        supplierId: "",
+        qualityFactors: {},
+        vehicleInfo: "",
+      });
     } catch (e: any) {
       if (e.message?.includes("already exists")) {
         toast.error(
@@ -288,6 +306,30 @@ function PurchaseForm({
           {selectedProductId && (
             <div className="space-y-6 pt-4 border-t">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <FormField
+                  control={form.control}
+                  name="receptionDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Fecha de ingreso{" "}
+                        <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <DatePicker
+                          value={field.value}
+                          onChange={(date) =>
+                            field.onChange(
+                              date ?? toLocalCalendarDate(new Date()),
+                            )
+                          }
+                          placeholder="Seleccione una fecha"
+                          disabled={(date) => toLocalCalendarDate(date) > today}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   name="lotNumber"
                   render={({ field }) => (

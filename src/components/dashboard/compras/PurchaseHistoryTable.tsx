@@ -22,7 +22,7 @@ import { useMemo, useState } from "react";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { convertFromCanonical, convertToCanonical } from "@/lib/units";
 import { Button } from "@/components/ui/button";
-import { ArrowDown, ArrowUp, SquarePen } from "lucide-react";
+import { ArrowDown, ArrowUp, SquarePen, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PaginationControls } from "../bodega/PaginationControls";
 import { formatNumber } from "@/lib/utils";
@@ -36,6 +36,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import {
   Select,
@@ -45,6 +56,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ExportActions } from "../exportaciones/ExportActions";
+import { DatePicker } from "@/components/ui/date-picker";
+import { toLocalCalendarDate, toLocalDayTimestamp } from "@/lib/date";
 
 type PurchaseHistoryRow = {
   _id: Id<"inventoryLots">;
@@ -267,7 +280,7 @@ export default function PurchaseHistoryTable() {
         id: "actions",
         header: "Acciones",
         cell: ({ row }) => (
-          <EditPurchaseEntryDialog
+          <PurchaseEntryActions
             entry={row.original}
             warehouses={warehouses ?? []}
             suppliers={suppliers ?? []}
@@ -419,6 +432,27 @@ export default function PurchaseHistoryTable() {
   );
 }
 
+function PurchaseEntryActions({
+  entry,
+  warehouses,
+  suppliers,
+}: {
+  entry: PurchaseHistoryRow;
+  warehouses: Array<{ _id: Id<"warehouse">; name: string }>;
+  suppliers: Array<{ _id: Id<"suppliers">; name: string }>;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <EditPurchaseEntryDialog
+        entry={entry}
+        warehouses={warehouses}
+        suppliers={suppliers}
+      />
+      <DeletePurchaseEntryDialog entry={entry} />
+    </div>
+  );
+}
+
 function EditPurchaseEntryDialog({
   entry,
   warehouses,
@@ -439,6 +473,19 @@ function EditPurchaseEntryDialog({
   const [quantityKg, setQuantityKg] = useState<string>(
     String(convertFromCanonical(entry.quantity, "kg")),
   );
+  const [receptionDate, setReceptionDate] = useState<Date>(
+    toLocalCalendarDate(new Date(entry.creationDate)),
+  );
+  const today = toLocalCalendarDate(new Date());
+
+  const resetFields = () => {
+    setLotNumber(entry.lotNumber);
+    setVehicleInfo(entry.vehicleInfo);
+    setWarehouseId(entry.warehouseId);
+    setSupplierId(entry.supplierId ?? "none");
+    setQuantityKg(String(convertFromCanonical(entry.quantity, "kg")));
+    setReceptionDate(toLocalCalendarDate(new Date(entry.creationDate)));
+  };
 
   const handleSave = async () => {
     const parsedQuantity = Number(quantityKg);
@@ -459,6 +506,9 @@ function EditPurchaseEntryDialog({
             ? undefined
             : (supplierId as Id<"suppliers">),
         quantity: convertToCanonical(parsedQuantity, "kg"),
+        receptionDate: toLocalDayTimestamp(
+          receptionDate ?? toLocalCalendarDate(new Date()),
+        ),
       });
       toast.success("Compra actualizada correctamente.");
       setOpen(false);
@@ -470,7 +520,15 @@ function EditPurchaseEntryDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          resetFields();
+        }
+        setOpen(nextOpen);
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon">
           <SquarePen className="size-4 text-primary" />
@@ -500,6 +558,17 @@ function EditPurchaseEntryDialog({
               step="any"
               value={quantityKg}
               onChange={(e) => setQuantityKg(e.target.value)}
+            />
+          </div>
+          <div>
+            <p className="text-sm mb-2">Fecha de ingreso</p>
+            <DatePicker
+              value={receptionDate}
+              onChange={(date) =>
+                setReceptionDate(date ?? toLocalCalendarDate(new Date()))
+              }
+              placeholder="Seleccione una fecha"
+              disabled={(date) => toLocalCalendarDate(date) > today}
             />
           </div>
           <div>
@@ -544,5 +613,49 @@ function EditPurchaseEntryDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DeletePurchaseEntryDialog({ entry }: { entry: PurchaseHistoryRow }) {
+  const deletePurchaseEntry = useMutation(api.purchases.deletePurchaseEntry);
+  const [open, setOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true);
+      await deletePurchaseEntry({ inventoryLotId: entry._id });
+      toast.success("Compra eliminada correctamente.");
+      setOpen(false);
+    } catch (error: any) {
+      toast.error(error?.message ?? "No se pudo eliminar la compra.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="icon" disabled={isDeleting}>
+          <Trash2 className="size-4 text-red-600" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar compra?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Esta acción eliminará la compra y su lote de inventario solo si no
+            tiene movimientos posteriores.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
+            {isDeleting ? "Eliminando..." : "Eliminar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
