@@ -27,7 +27,8 @@ import {
 } from "@/components/ui/select";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { PlusIcon } from "lucide-react";
-import { convertToCanonical } from "@/lib/units";
+import { convertFromCanonical, convertToCanonical } from "@/lib/units";
+import { formatNumber } from "@/lib/utils";
 
 type PossibleOutput = {
   _id: Id<"products">;
@@ -73,6 +74,9 @@ export default function CreateProductionOutputFlow() {
         inputLotNumber: string;
         runDate: number;
         outputsCount: number;
+        quantityConsumed: number;
+        quantityProducedTotal: number;
+        quantityAvailableForOutput: number;
       }>
     | undefined;
 
@@ -99,6 +103,14 @@ export default function CreateProductionOutputFlow() {
   });
 
   const selectedRun = (productionRuns ?? []).find((run) => run._id === selectedRunId);
+  const watchedOutputs = useWatch({ control: form.control, name: "outputs" }) ?? [];
+  const pendingOutputTotal = watchedOutputs.reduce(
+    (total, output) => total + (Number(output?.quantityProduced) || 0),
+    0,
+  );
+  const availableOutputKg = selectedRun
+    ? convertFromCanonical(selectedRun.quantityAvailableForOutput, "kg")
+    : 0;
 
   useEffect(() => {
     form.setValue("outputs", []);
@@ -136,6 +148,20 @@ export default function CreateProductionOutputFlow() {
   };
 
   const onSubmit = async (data: FormValues) => {
+    if (!selectedRun) {
+      toast.error("Debe seleccionar una entrada de producción.");
+      return;
+    }
+    const requestedTotal = data.outputs.reduce(
+      (total, output) => total + output.quantityProduced,
+      0,
+    );
+    if (requestedTotal > availableOutputKg) {
+      toast.error(
+        `La suma de las salidas no puede superar ${formatNumber(availableOutputKg)} kg disponibles.`,
+      );
+      return;
+    }
     setIsSubmitting(true);
     try {
       await addOutputsToProductionRun({
@@ -207,6 +233,17 @@ export default function CreateProductionOutputFlow() {
             <fieldset className="space-y-4 pt-4 border-t">
               <legend className="text-lg font-semibold">Salidas de Producción</legend>
 
+              <div className="rounded-md border bg-muted/40 p-4 text-sm">
+                <p className="font-medium">
+                  {selectedRun.inputProductName} — {selectedRun.inputLotNumber}
+                </p>
+                <p className="text-muted-foreground">
+                  Entrada: {formatNumber(convertFromCanonical(selectedRun.quantityConsumed, "kg"))} kg ·{" "}
+                  Producido: {formatNumber(convertFromCanonical(selectedRun.quantityProducedTotal, "kg"))} kg ·{" "}
+                  Disponible: {formatNumber(availableOutputKg)} kg
+                </p>
+              </div>
+
               {fields.map((field, index) => (
                 <OutputCard
                   key={field.id}
@@ -214,18 +251,26 @@ export default function CreateProductionOutputFlow() {
                   index={index}
                   warehouses={warehouses}
                   possibleOutputs={possibleOutputs ?? []}
+                  maxQuantityKg={Math.max(
+                    0,
+                    availableOutputKg -
+                      pendingOutputTotal +
+                      (Number(watchedOutputs[index]?.quantityProduced) || 0),
+                  )}
                   onRemove={() => remove(index)}
                 />
               ))}
 
-              <Button type="button" variant="outline" onClick={handleAddOutput}>
-                <PlusIcon className="size-4 mr-2" />
-                Añadir Salida
-              </Button>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Button type="button" variant="outline" onClick={handleAddOutput} className="w-full sm:w-auto">
+                  <PlusIcon className="size-4 mr-2" />
+                  Añadir Salida
+                </Button>
 
-              <Button type="submit" disabled={isSubmitting} className="w-full md:w-auto">
-                {isSubmitting ? <LoadingSpinner /> : "Registrar Salida"}
-              </Button>
+                <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
+                  {isSubmitting ? <LoadingSpinner /> : "Registrar Salida"}
+                </Button>
+              </div>
             </fieldset>
           )}
         </form>
@@ -239,6 +284,7 @@ function OutputCard({
   index,
   warehouses,
   possibleOutputs,
+  maxQuantityKg,
   onRemove,
 }: any) {
   const outputProductId = useWatch({
@@ -314,6 +360,9 @@ function OutputCard({
             <FormControl>
               <Input
                 type="number"
+                min="0"
+                max={maxQuantityKg}
+                step="any"
                 value={field.value ?? ""}
                 onChange={(e) => field.onChange(Number(e.target.value))}
               />

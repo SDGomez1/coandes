@@ -85,6 +85,7 @@ type FlatProductionHistoryRow = {
   quantityConsumed: { value: number; unit: string };
   outputProduct: string;
   quantityProduced: { value: number; unit: string };
+  runProducedTotal: number;
   newLotNumber: string;
   qualityFactors: { name: string; value: string }[];
 };
@@ -107,6 +108,11 @@ const OUTPUT_TYPE_LABELS = {
   standard: "No",
   merma: "Sí",
 } as const;
+
+function parsedFiniteKg(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
 
 export default function ProductionHistoryTable() {
   const organization = useQuery(api.organizations.getOrg);
@@ -140,6 +146,10 @@ export default function ProductionHistoryTable() {
           value: output.quantityProduced,
           unit: output.unit,
         },
+        runProducedTotal: run.outputs.reduce(
+          (total, currentOutput) => total + currentOutput.quantityProduced,
+          0,
+        ),
         newLotNumber: output.newLotNumber,
         qualityFactors: output.qualityFactors,
       })),
@@ -323,17 +333,7 @@ export default function ProductionHistoryTable() {
       }),
       outputColumnHelper.accessor("qualityFactors", {
         header: "Factores de Calidad",
-        cell: (info) => {
-          const factors = info.getValue();
-          if (factors.length === 0) return "N/A";
-          return (
-            <ul className="list-disc list-inside">
-              {factors.map((f) => (
-                <li key={f.name}>{`${f.name}: ${f.value}`}</li>
-              ))}
-            </ul>
-          );
-        },
+        cell: (info) => <QualityFactorsDialog factors={info.getValue()} />,
         enableSorting: false,
       }),
       outputColumnHelper.display({
@@ -632,7 +632,7 @@ function ProductionHistoryDataTable<TData>({
   table: TanStackTable<TData>;
 }) {
   return (
-    <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">
+    <div className="overflow-x-auto shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -661,6 +661,44 @@ function ProductionHistoryDataTable<TData>({
       </Table>
       <PaginationControls table={table} />
     </div>
+  );
+}
+
+function QualityFactorsDialog({
+  factors,
+}: {
+  factors: { name: string; value: string }[];
+}) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="link" size="sm" className="h-auto p-0 whitespace-nowrap">
+          Ver factores
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Factores de Calidad</DialogTitle>
+        </DialogHeader>
+        {factors.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Sin factores de calidad.
+          </p>
+        ) : (
+          <div className="max-h-[60vh] overflow-y-auto rounded-md border">
+            {factors.map((factor, index) => (
+              <div
+                key={`${factor.name}-${index}`}
+                className="flex items-start justify-between gap-4 border-b px-4 py-3 last:border-b-0"
+              >
+                <span className="font-medium">{factor.name}</span>
+                <span className="text-right break-words">{factor.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -923,14 +961,24 @@ function EditProductionOutputDialog({
       toast.error("La cantidad consumida debe ser mayor que cero.");
       return;
     }
+    const producedCanonical = convertToCanonical(parsedProduced, "kg");
+    const consumedCanonical = convertToCanonical(parsedConsumed, "kg");
+    const totalAfterEdit =
+      entry.runProducedTotal - entry.quantityProduced.value + producedCanonical;
+    if (totalAfterEdit > consumedCanonical) {
+      toast.error(
+        `La suma de las salidas no puede superar ${formatNumber(parsedConsumed)} kg consumidos.`,
+      );
+      return;
+    }
 
     try {
       setIsSaving(true);
       await editProductionOutputEntry({
         productionRunId: entry.runId,
         productionOutputId: entry.productionOutputId,
-        quantityConsumed: convertToCanonical(parsedConsumed, "kg"),
-        quantityProduced: convertToCanonical(parsedProduced, "kg"),
+        quantityConsumed: consumedCanonical,
+        quantityProduced: producedCanonical,
         lotNumber,
         warehouseId: warehouseId as Id<"warehouse">,
       });
@@ -963,6 +1011,7 @@ function EditProductionOutputDialog({
               type="number"
               inputMode="decimal"
               step="any"
+              min="0"
               value={quantityConsumedKg}
               onChange={(e) => setQuantityConsumedKg(e.target.value)}
             />
@@ -973,6 +1022,15 @@ function EditProductionOutputDialog({
               type="number"
               inputMode="decimal"
               step="any"
+              min="0"
+              max={Math.max(
+                0,
+                parsedFiniteKg(quantityConsumedKg) -
+                  convertFromCanonical(
+                    entry.runProducedTotal - entry.quantityProduced.value,
+                    "kg",
+                  ),
+              )}
               value={quantityProducedKg}
               onChange={(e) => setQuantityProducedKg(e.target.value)}
             />

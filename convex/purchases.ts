@@ -159,19 +159,29 @@ export const editPurchaseEntry = mutation({
       throw new Error(`Lot number ${args.lotNumber} already exists.`);
     }
 
+    const purchaseRecordedQuantity = await getPurchasedQuantityForLot(ctx, lot);
+    const quantityDelta = args.quantity - purchaseRecordedQuantity;
+    const resultingAvailableQuantity = lot.quantity + quantityDelta;
+
+    if (resultingAvailableQuantity < 0) {
+      throw new Error(
+        "La cantidad de compra no puede ser menor que la cantidad ya consumida o despachada.",
+      );
+    }
+
     const usedCapacity = await getUsedWarehouseCapacity(
       ctx,
       args.warehouseId,
       args.inventoryLotId,
     );
-    if (usedCapacity + args.quantity > targetWarehouse.capacity) {
+    if (usedCapacity + resultingAvailableQuantity > targetWarehouse.capacity) {
       throw new Error("Insufficient warehouse capacity for the edited lot.");
     }
 
     await ctx.db.patch(args.inventoryLotId, {
       warehouseId: args.warehouseId,
       lotNumber: args.lotNumber,
-      quantity: args.quantity,
+      quantity: resultingAvailableQuantity,
       creationDate: args.receptionDate,
       vehicleInfo: args.vehicleInfo,
     });
@@ -181,7 +191,6 @@ export const editPurchaseEntry = mutation({
       orderDate: args.receptionDate,
     });
 
-    const quantityDelta = args.quantity - lot.quantity;
     if (quantityDelta !== 0) {
       await ctx.db.insert("activityLog", {
         organizationId: lot.organizationId,
@@ -228,12 +237,16 @@ export const deletePurchaseEntry = mutation({
     });
 
     if (hasLaterMovement) {
-      throw new Error("No se puede borrar una compra con movimientos posteriores.");
+      throw new Error(
+        "No se puede eliminar este tiquete porque tiene movimientos posteriores.",
+      );
     }
 
     const purchaseRecordedQuantity = await getPurchasedQuantityForLot(ctx, lot);
     if (lot.quantity < purchaseRecordedQuantity) {
-      throw new Error("No se puede borrar una compra con movimientos posteriores.");
+      throw new Error(
+        "No se puede eliminar este tiquete porque tiene movimientos posteriores.",
+      );
     }
 
     for (const entry of lotActivity) {

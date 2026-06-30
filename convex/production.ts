@@ -75,6 +75,9 @@ export const createProductionRun = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    if (args.quantityConsumed <= 0) {
+      throw new Error("La cantidad consumida debe ser mayor que cero.");
+    }
     const inputLot = await ctx.db.get(args.inputLotId);
     if (!inputLot) {
       throw new Error("Input inventory lot not found.");
@@ -92,6 +95,15 @@ export const createProductionRun = mutation({
       inputLot.productId,
       args.outputs,
     );
+    const initialProducedTotal = resolvedOutputs.reduce(
+      (total, output) => total + output.quantityProduced,
+      0,
+    );
+    if (initialProducedTotal > args.quantityConsumed) {
+      throw new Error(
+        "La suma de las salidas no puede superar la cantidad consumida de la entrada.",
+      );
+    }
 
     for (const output of resolvedOutputs) {
       const product = await ctx.db.get(output.productId);
@@ -355,6 +367,32 @@ export const editProductionOutputEntry = mutation({
       );
     }
 
+    const runOutputs = await ctx.db
+      .query("productionOutputs")
+      .withIndex("by_run", (q) => q.eq("productionRunId", run._id))
+      .collect();
+    const totalProducedAfterEdit = runOutputs.reduce(
+      (total, currentOutput) =>
+        total +
+        (currentOutput._id === output._id
+          ? args.quantityProduced
+          : currentOutput.quantityProduced),
+      0,
+    );
+    if (totalProducedAfterEdit > args.quantityConsumed) {
+      throw new Error(
+        "La suma de las salidas no puede superar la cantidad consumida de la entrada.",
+      );
+    }
+
+    const outputDelta = args.quantityProduced - output.quantityProduced;
+    const resultingOutputQuantity = outputLot.quantity + outputDelta;
+    if (resultingOutputQuantity < 0) {
+      throw new Error(
+        "La cantidad producida no puede ser menor que la cantidad ya consumida o despachada.",
+      );
+    }
+
     const targetWarehouse = await ctx.db.get(args.warehouseId);
     if (!targetWarehouse) {
       throw new Error("Warehouse not found.");
@@ -383,7 +421,7 @@ export const editProductionOutputEntry = mutation({
       args.warehouseId,
       outputLot._id,
     );
-    if (usedCapacity + args.quantityProduced > targetWarehouse.capacity) {
+    if (usedCapacity + resultingOutputQuantity > targetWarehouse.capacity) {
       throw new Error("Insufficient warehouse capacity for the edited lot.");
     }
 
@@ -397,7 +435,7 @@ export const editProductionOutputEntry = mutation({
     await ctx.db.patch(outputLot._id, {
       warehouseId: args.warehouseId,
       lotNumber: args.lotNumber,
-      quantity: args.quantityProduced,
+      quantity: resultingOutputQuantity,
     });
 
     await ctx.db.patch(output._id, {
@@ -416,7 +454,6 @@ export const editProductionOutputEntry = mutation({
       });
     }
 
-    const outputDelta = args.quantityProduced - output.quantityProduced;
     if (outputDelta !== 0) {
       await ctx.db.insert("activityLog", {
         organizationId: run.organizationId,
@@ -467,6 +504,23 @@ export const addOutputsToProductionRun = mutation({
       inputLot.productId,
       args.outputs,
     );
+    const existingOutputs = await ctx.db
+      .query("productionOutputs")
+      .withIndex("by_run", (q) => q.eq("productionRunId", run._id))
+      .collect();
+    const producedTotal = existingOutputs.reduce(
+      (total, output) => total + output.quantityProduced,
+      0,
+    );
+    const newProducedTotal = resolvedOutputs.reduce(
+      (total, output) => total + output.quantityProduced,
+      producedTotal,
+    );
+    if (newProducedTotal > run.quantityConsumed) {
+      throw new Error(
+        "La suma de las salidas no puede superar la cantidad consumida de la entrada.",
+      );
+    }
 
     for (const output of resolvedOutputs) {
       if (output.quantityProduced <= 0) {
@@ -563,6 +617,18 @@ export const getProductionRunsForOutput = query({
           inputProductName: product?.name ?? "N/A",
           inputProductId: inputLot?.productId,
           quantityConsumed: run.quantityConsumed,
+          quantityProducedTotal: outputs.reduce(
+            (total, output) => total + output.quantityProduced,
+            0,
+          ),
+          quantityAvailableForOutput: Math.max(
+            0,
+            run.quantityConsumed -
+              outputs.reduce(
+                (total, output) => total + output.quantityProduced,
+                0,
+              ),
+          ),
           outputsCount: outputs.length,
         };
       }),

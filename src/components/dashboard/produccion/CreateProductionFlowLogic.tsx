@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -79,6 +79,13 @@ export default function ProductionEntryForm() {
   const inputLotId = useWatch({ control: form.control, name: "inputLotId" });
   const selectedInputLot = availableLots?.find((lot) => lot._id === inputLotId);
 
+  useEffect(() => {
+    if (availableLots && inputLotId && !selectedInputLot) {
+      form.setValue("inputLotId", "");
+      form.setValue("quantityConsumed", undefined);
+    }
+  }, [availableLots, form, inputLotId, selectedInputLot]);
+
   const onSubmit = async (data: ProductionEntrySubmitValues) => {
     if (!selectedInputLot || data.quantityConsumed > selectedInputLot.quantity) {
       form.setError("quantityConsumed", {
@@ -131,7 +138,14 @@ export default function ProductionEntryForm() {
                     <FormLabel>
                       Producto de Entrada <span className="text-destructive">*</span>
                     </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        form.setValue("inputLotId", "");
+                        form.setValue("quantityConsumed", undefined);
+                      }}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Seleccione un producto..." />
@@ -157,7 +171,7 @@ export default function ProductionEntryForm() {
                       <FormLabel>
                         No Tiquete <span className="text-destructive">*</span>
                       </FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue
@@ -196,6 +210,9 @@ export default function ProductionEntryForm() {
                         <Input
                           placeholder="Cantidad en kg"
                           type="number"
+                          min="0"
+                          max={convertFromCanonical(selectedInputLot.quantity, "kg")}
+                          step="any"
                           value={field.value ?? ""}
                           onChange={(e) =>
                             field.onChange(

@@ -628,7 +628,12 @@ function DeletePurchaseEntryDialog({ entry }: { entry: PurchaseHistoryRow }) {
       toast.success("Compra eliminada correctamente.");
       setOpen(false);
     } catch (error: any) {
-      toast.error(error?.message ?? "No se pudo eliminar la compra.");
+      const message = String(error?.message ?? "");
+      toast.error(
+        message.includes("movimientos posteriores")
+          ? "No se puede eliminar este tiquete porque tiene movimientos posteriores."
+          : "No se pudo eliminar el tiquete. Verifique que no tenga movimientos asociados e intente nuevamente.",
+      );
     } finally {
       setIsDeleting(false);
     }
