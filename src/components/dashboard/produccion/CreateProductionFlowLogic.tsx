@@ -18,6 +18,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select,
   SelectContent,
@@ -26,11 +27,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
+import { toLocalCalendarDate, toLocalDayTimestamp } from "@/lib/date";
 import { convertFromCanonical, convertToCanonical } from "@/lib/units";
 
 const formSchema = z.object({
   inputProductId: z.string().min(1, "Debe seleccionar un producto de entrada."),
   inputLotId: z.string().min(1, "Debe seleccionar un lote de entrada."),
+  productionDate: z.date({ error: "Debe seleccionar una fecha." }),
   quantityConsumed: z.preprocess(
     (value) =>
       value === "" || value === undefined || value === null
@@ -48,6 +51,7 @@ export default function ProductionEntryForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const organization = useQuery(api.organizations.getOrg);
   const orgId = organization?._id;
+  const today = toLocalCalendarDate(new Date());
 
   const producibleStock = useQuery(
     api.inventory.getProducibleStock,
@@ -60,6 +64,7 @@ export default function ProductionEntryForm() {
     defaultValues: {
       inputProductId: "",
       inputLotId: "",
+      productionDate: today,
       notes: "",
     },
   });
@@ -103,12 +108,18 @@ export default function ProductionEntryForm() {
       await createProductionRun({
         organizationId: orgId!,
         inputLotId: data.inputLotId as Id<"inventoryLots">,
+        productionDate: toLocalDayTimestamp(data.productionDate),
         quantityConsumed: convertToCanonical(data.quantityConsumed, "kg"),
         notes: data.notes,
         outputs: [],
       });
       toast.success("Entrada de producción registrada.");
-      form.reset();
+      form.reset({
+        inputProductId: "",
+        inputLotId: "",
+        productionDate: toLocalCalendarDate(new Date()),
+        notes: "",
+      });
     } catch (error) {
       console.error("Production entry creation failed:", error);
       toast.error("Error al registrar la entrada de producción.");
@@ -222,6 +233,29 @@ export default function ProductionEntryForm() {
                         />
                         <span className="font-medium">kg</span>
                       </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="productionDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Fecha de entrada <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <DatePicker
+                        value={field.value}
+                        onChange={(date) =>
+                          field.onChange(date ?? toLocalCalendarDate(new Date()))
+                        }
+                        placeholder="Seleccione una fecha"
+                        disabled={(date) => toLocalCalendarDate(date) > today}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

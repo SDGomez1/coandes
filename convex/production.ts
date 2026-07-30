@@ -54,6 +54,7 @@ export const createProductionRun = mutation({
   args: {
     organizationId: v.id("organizations"),
     inputLotId: v.id("inventoryLots"),
+    productionDate: v.optional(v.number()),
     quantityConsumed: v.number(),
     notes: v.optional(v.string()),
     outputs: v.array(
@@ -104,6 +105,7 @@ export const createProductionRun = mutation({
         "La suma de las salidas no puede superar la cantidad consumida de la entrada.",
       );
     }
+    const productionTimestamp = args.productionDate ?? Date.now();
 
     for (const output of resolvedOutputs) {
       const product = await ctx.db.get(output.productId);
@@ -132,7 +134,7 @@ export const createProductionRun = mutation({
 
     const productionRunId = await ctx.db.insert("productionRuns", {
       organizationId: args.organizationId,
-      runDate: Date.now(),
+      runDate: productionTimestamp,
       inputLotId: args.inputLotId,
       quantityConsumed: args.quantityConsumed,
       notes: args.notes,
@@ -148,7 +150,7 @@ export const createProductionRun = mutation({
       activityType: "production_out",
       quantityChange: -args.quantityConsumed,
       relatedId: productionRunId,
-      timestamp: Date.now(),
+      timestamp: productionTimestamp,
     });
 
     // 6. Process all outputs
@@ -166,7 +168,7 @@ export const createProductionRun = mutation({
         warehouseId: output.warehouseId,
         lotNumber: output.lotNumber,
         quantity: output.quantityProduced,
-        creationDate: Date.now(),
+        creationDate: productionTimestamp,
         source: {
           type: "production",
           productionRunId: productionRunId,
@@ -181,7 +183,7 @@ export const createProductionRun = mutation({
         activityType: "production_in",
         quantityChange: output.quantityProduced,
         relatedId: productionRunId,
-        timestamp: Date.now(),
+        timestamp: productionTimestamp,
       });
 
       const outputId = await ctx.db.insert("productionOutputs", {
@@ -470,6 +472,7 @@ export const editProductionOutputEntry = mutation({
 export const addOutputsToProductionRun = mutation({
   args: {
     productionRunId: v.id("productionRuns"),
+    outputDate: v.optional(v.number()),
     outputs: v.array(
       v.object({
         productId: v.id("products"),
@@ -521,6 +524,7 @@ export const addOutputsToProductionRun = mutation({
         "La suma de las salidas no puede superar la cantidad consumida de la entrada.",
       );
     }
+    const outputTimestamp = args.outputDate ?? Date.now();
 
     for (const output of resolvedOutputs) {
       if (output.quantityProduced <= 0) {
@@ -555,7 +559,7 @@ export const addOutputsToProductionRun = mutation({
         warehouseId: output.warehouseId,
         lotNumber: output.lotNumber,
         quantity: output.quantityProduced,
-        creationDate: Date.now(),
+        creationDate: outputTimestamp,
         source: {
           type: "production",
           productionRunId: run._id,
@@ -569,7 +573,7 @@ export const addOutputsToProductionRun = mutation({
         activityType: "production_in",
         quantityChange: output.quantityProduced,
         relatedId: run._id,
-        timestamp: Date.now(),
+        timestamp: outputTimestamp,
       });
 
       const outputId = await ctx.db.insert("productionOutputs", {
@@ -694,6 +698,7 @@ export const getProductionHistory = query({
               resultingInventoryLotId: output.resultingInventoryLotId,
               outputType: normalizeOutputType(output.outputType),
               warehouseId: lot?.warehouseId,
+              outputDate: lot?.creationDate ?? run.runDate,
               newLotNumber: lot?.lotNumber ?? "N/A (By-product)",
               unit: product?.baseUnit ?? "",
               qualityFactors: qualityFactorsWithNames,

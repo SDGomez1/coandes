@@ -66,6 +66,7 @@ type ProductionHistoryRow = {
     resultingInventoryLotId?: Id<"inventoryLots">;
     outputType: "standard" | "merma";
     warehouseId?: Id<"warehouse">;
+    outputDate: number;
     newLotNumber: string;
     unit: string;
     qualityFactors: { name: string; value: string }[];
@@ -79,6 +80,7 @@ type FlatProductionHistoryRow = {
   outputLotId?: Id<"inventoryLots">;
   outputWarehouseId?: Id<"warehouse">;
   runDate: number;
+  outputDate: number;
   inputProductName: string;
   inputLotNumber: string;
   outputType: "standard" | "merma";
@@ -134,6 +136,7 @@ export default function ProductionHistoryTable() {
         outputLotId: output.resultingInventoryLotId,
         outputWarehouseId: output.warehouseId,
         runDate: run.runDate,
+        outputDate: output.outputDate,
         inputProductName: run.inputProductName,
         inputLotNumber: run.inputLotNumber,
         outputType: output.outputType,
@@ -181,7 +184,7 @@ export default function ProductionHistoryTable() {
 
   const outputColumns = useMemo(
     () => [
-      outputColumnHelper.accessor("runDate", {
+      outputColumnHelper.accessor("outputDate", {
         header: ({ column }) => (
           <Button
             variant="ghost"
@@ -530,7 +533,7 @@ export default function ProductionHistoryTable() {
   const outputExportColumns: ExportColumn<FlatProductionHistoryRow>[] = [
     {
       header: "Fecha",
-      value: (row) => new Date(row.runDate).toLocaleDateString(),
+      value: (row) => new Date(row.outputDate).toLocaleDateString(),
     },
     { header: "Producto Entrada", value: (row) => row.inputProductName },
     { header: "Lote Entrada", value: (row) => row.inputLotNumber },

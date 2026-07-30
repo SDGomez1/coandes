@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   Select,
   SelectContent,
@@ -28,6 +29,7 @@ import {
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { PlusIcon } from "lucide-react";
 import { convertFromCanonical, convertToCanonical } from "@/lib/units";
+import { toLocalCalendarDate, toLocalDayTimestamp } from "@/lib/date";
 import { formatNumber } from "@/lib/utils";
 
 type PossibleOutput = {
@@ -51,6 +53,7 @@ const outputSchema = z.object({
 
 const formSchema = z.object({
   productionRunId: z.string().min(1, "Debe seleccionar una entrada de producción."),
+  outputDate: z.date({ error: "Debe seleccionar una fecha." }),
   outputs: z.array(outputSchema).min(1, "Debe agregar al menos una salida."),
 });
 
@@ -61,6 +64,7 @@ export default function CreateProductionOutputFlow() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const organization = useQuery(api.organizations.getOrg);
   const orgId = organization?._id;
+  const today = toLocalCalendarDate(new Date());
 
   const warehouses = useQuery(api.warehouse.getAvailableWarehouse);
   const productionRuns = useQuery(
@@ -88,6 +92,7 @@ export default function CreateProductionOutputFlow() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       productionRunId: "",
+      outputDate: today,
       outputs: [],
     },
   });
@@ -166,6 +171,7 @@ export default function CreateProductionOutputFlow() {
     try {
       await addOutputsToProductionRun({
         productionRunId: data.productionRunId as Id<"productionRuns">,
+        outputDate: toLocalDayTimestamp(data.outputDate),
         outputs: data.outputs.map((o) => ({
           productId: o.productId as Id<"products">,
           quantityProduced: convertToCanonical(o.quantityProduced, "kg"),
@@ -179,7 +185,11 @@ export default function CreateProductionOutputFlow() {
         })),
       });
       toast.success("Salida de producción registrada.");
-      form.reset({ productionRunId: "", outputs: [] });
+      form.reset({
+        productionRunId: "",
+        outputDate: toLocalCalendarDate(new Date()),
+        outputs: [],
+      });
     } catch (error) {
       console.error(error);
       toast.error(
@@ -232,6 +242,28 @@ export default function CreateProductionOutputFlow() {
           {selectedRun && (
             <fieldset className="space-y-4 pt-4 border-t">
               <legend className="text-lg font-semibold">Salidas de Producción</legend>
+
+              <FormField
+                control={form.control}
+                name="outputDate"
+                render={({ field }) => (
+                  <FormItem className="max-w-xs">
+                    <FormLabel>
+                      Fecha de salida <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <DatePicker
+                        value={field.value}
+                        onChange={(date) =>
+                          field.onChange(date ?? toLocalCalendarDate(new Date()))
+                        }
+                        placeholder="Seleccione una fecha"
+                        disabled={(date) => toLocalCalendarDate(date) > today}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
 
               <div className="rounded-md border bg-muted/40 p-4 text-sm">
                 <p className="font-medium">
