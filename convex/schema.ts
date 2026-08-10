@@ -171,6 +171,8 @@ export default defineSchema({
 
   productionOutputs: defineTable({
     productionRunId: v.id("productionRuns"),
+    // Optional so existing production documents remain valid.
+    outputDate: v.optional(v.number()),
     productId: v.id("products"),
     quantityProduced: v.number(),
     resultingInventoryLotId: v.optional(v.id("inventoryLots")),

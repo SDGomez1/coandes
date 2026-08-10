@@ -143,6 +143,28 @@ export default function ProductionEntryForm() {
             <legend className="text-lg font-semibold">Entrada de Producción</legend>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField
+                control={form.control}
+                name="productionDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Fecha de entrada <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <DatePicker
+                        value={field.value}
+                        onChange={(date) =>
+                          field.onChange(date ?? toLocalCalendarDate(new Date()))
+                        }
+                        placeholder="Seleccione una fecha"
+                        disabled={(date) => toLocalCalendarDate(date) > today}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
                 name="inputProductId"
                 render={({ field }) => (
                   <FormItem>
@@ -233,29 +255,6 @@ export default function ProductionEntryForm() {
                         />
                         <span className="font-medium">kg</span>
                       </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="productionDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Fecha de entrada <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <DatePicker
-                        value={field.value}
-                        onChange={(date) =>
-                          field.onChange(date ?? toLocalCalendarDate(new Date()))
-                        }
-                        placeholder="Seleccione una fecha"
-                        disabled={(date) => toLocalCalendarDate(date) > today}
-                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

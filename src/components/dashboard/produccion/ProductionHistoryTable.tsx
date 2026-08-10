@@ -26,7 +26,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { convertFromCanonical, convertToCanonical, WeightUnit } from "@/lib/units";
 import { Button } from "@/components/ui/button";
-import { ArrowDown, ArrowUp, SquarePen } from "lucide-react";
+import { ArrowDown, ArrowUp, SquarePen, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PaginationControls } from "../bodega/PaginationControls";
 import { formatNumber } from "@/lib/utils";
@@ -47,6 +47,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ExportActions } from "../exportaciones/ExportActions";
+import { DatePicker } from "@/components/ui/date-picker";
+import { toLocalCalendarDate, toLocalDayTimestamp } from "@/lib/date";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type ProductionHistoryRow = {
   _id: Id<"productionRuns">;
@@ -60,13 +73,13 @@ type ProductionHistoryRow = {
   notes?: string;
   outputs: {
     _id: Id<"productionOutputs">;
+    outputDate: number;
     productId: Id<"products">;
     productName: string;
     quantityProduced: number;
     resultingInventoryLotId?: Id<"inventoryLots">;
     outputType: "standard" | "merma";
     warehouseId?: Id<"warehouse">;
-    outputDate: number;
     newLotNumber: string;
     unit: string;
     qualityFactors: { name: string; value: string }[];
@@ -343,10 +356,13 @@ export default function ProductionHistoryTable() {
         id: "actions",
         header: "Acciones",
         cell: ({ row }) => (
-          <EditProductionOutputDialog
-            entry={row.original}
-            warehouses={warehouses ?? []}
-          />
+          <div className="flex items-center">
+            <EditProductionOutputDialog
+              entry={row.original}
+              warehouses={warehouses ?? []}
+            />
+            <DeleteProductionOutputDialog entry={row.original} />
+          </div>
         ),
       }),
     ],
@@ -449,7 +465,12 @@ export default function ProductionHistoryTable() {
       entryColumnHelper.display({
         id: "actions",
         header: "Acciones",
-        cell: ({ row }) => <EditProductionRunEntryDialog entry={row.original} />,
+        cell: ({ row }) => (
+          <div className="flex items-center">
+            <EditProductionRunEntryDialog entry={row.original} />
+            <DeleteProductionRunDialog entry={row.original} />
+          </div>
+        ),
       }),
     ],
     [],
@@ -728,6 +749,9 @@ function EditProductionRunEntryDialog({
     String(convertFromCanonical(entry.quantityConsumed.value, "kg")),
   );
   const [notes, setNotes] = useState(entry.notes ?? "");
+  const [runDate, setRunDate] = useState<Date>(
+    toLocalCalendarDate(new Date(entry.runDate)),
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -735,6 +759,7 @@ function EditProductionRunEntryDialog({
     setSelectedLotId(entry.inputLotId);
     setQuantityConsumedKg(String(convertFromCanonical(entry.quantityConsumed.value, "kg")));
     setNotes(entry.notes ?? "");
+    setRunDate(toLocalCalendarDate(new Date(entry.runDate)));
   }, [entry, open]);
 
   const productOptions = [...(producibleStock ?? [])];
@@ -811,6 +836,7 @@ function EditProductionRunEntryDialog({
         inputLotId: (sourceFieldsLocked ? entry.inputLotId : selectedLotId) as Id<"inventoryLots">,
         quantityConsumed: convertToCanonical(parsedConsumed, "kg"),
         notes: notes.trim() ? notes.trim() : undefined,
+        runDate: toLocalDayTimestamp(runDate),
       });
       toast.success("Entrada de producción actualizada correctamente.");
       setOpen(false);
@@ -844,8 +870,8 @@ function EditProductionRunEntryDialog({
         {sourceFieldsLocked && (
           <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             Esta entrada ya tiene salidas registradas. Para proteger la trazabilidad,
-            producto, lote y cantidad consumida quedan bloqueados. Solo puedes editar
-            las notas.
+            producto, lote y cantidad consumida quedan bloqueados. Puedes editar
+            la fecha y las notas.
           </div>
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -912,6 +938,18 @@ function EditProductionRunEntryDialog({
             <p className="text-sm mb-2">Notas</p>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
+          <div>
+            <p className="text-sm mb-2">Fecha de entrada</p>
+            <DatePicker
+              value={runDate}
+              onChange={(date) =>
+                setRunDate(date ?? toLocalCalendarDate(new Date(entry.runDate)))
+              }
+              disabled={(date) =>
+                toLocalCalendarDate(date) > toLocalCalendarDate(new Date())
+              }
+            />
+          </div>
         </div>
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>
@@ -947,6 +985,22 @@ function EditProductionOutputDialog({
   const [quantityConsumedKg, setQuantityConsumedKg] = useState<string>(
     String(convertFromCanonical(entry.quantityConsumed.value, "kg")),
   );
+  const [outputDate, setOutputDate] = useState<Date>(
+    toLocalCalendarDate(new Date(entry.outputDate)),
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setLotNumber(entry.newLotNumber);
+    setWarehouseId(entry.outputWarehouseId ?? "");
+    setQuantityProducedKg(
+      String(convertFromCanonical(entry.quantityProduced.value, "kg")),
+    );
+    setQuantityConsumedKg(
+      String(convertFromCanonical(entry.quantityConsumed.value, "kg")),
+    );
+    setOutputDate(toLocalCalendarDate(new Date(entry.outputDate)));
+  }, [entry, open]);
 
   const handleSave = async () => {
     if (!entry.outputLotId || !warehouseId) {
@@ -984,6 +1038,7 @@ function EditProductionOutputDialog({
         quantityProduced: producedCanonical,
         lotNumber,
         warehouseId: warehouseId as Id<"warehouse">,
+        outputDate: toLocalDayTimestamp(outputDate),
       });
       toast.success("Producción actualizada correctamente.");
       setOpen(false);
@@ -1057,6 +1112,22 @@ function EditProductionOutputDialog({
               </SelectContent>
             </Select>
           </div>
+          <div>
+            <p className="text-sm mb-2">Fecha de salida</p>
+            <DatePicker
+              value={outputDate}
+              onChange={(date) =>
+                setOutputDate(date ?? toLocalCalendarDate(new Date(entry.outputDate)))
+              }
+              disabled={(date) => {
+                const day = toLocalCalendarDate(date);
+                return (
+                  day > toLocalCalendarDate(new Date()) ||
+                  day < toLocalCalendarDate(new Date(entry.runDate))
+                );
+              }}
+            />
+          </div>
         </div>
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => setOpen(false)} disabled={isSaving}>
@@ -1068,5 +1139,108 @@ function EditProductionOutputDialog({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DeleteProductionRunDialog({ entry }: { entry: ProductionEntryRow }) {
+  const deleteEntry = useMutation(api.production.deleteProductionRunEntry);
+  const [open, setOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true);
+      await deleteEntry({ productionRunId: entry.runId });
+      toast.success("Entrada de producción eliminada correctamente.");
+      setOpen(false);
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo eliminar la entrada de producción.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="icon" disabled={isDeleting}>
+          <Trash2 className="size-4 text-red-600" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar entrada de producción?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Se devolverá la cantidad consumida al lote de entrada. La operación
+            solo se permite si no existen salidas asociadas.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
+            {isDeleting ? "Eliminando..." : "Eliminar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+function DeleteProductionOutputDialog({
+  entry,
+}: {
+  entry: FlatProductionHistoryRow;
+}) {
+  const deleteOutput = useMutation(api.production.deleteProductionOutput);
+  const [open, setOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true);
+      await deleteOutput({
+        productionRunId: entry.runId,
+        productionOutputId: entry.productionOutputId,
+      });
+      toast.success("Salida de producción eliminada correctamente.");
+      setOpen(false);
+    } catch (error: unknown) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "No se pudo eliminar la salida de producción.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="icon" disabled={isDeleting}>
+          <Trash2 className="size-4 text-red-600" />
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Eliminar salida de producción?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Se eliminarán el lote de salida y sus factores de calidad. La
+            operación se bloqueará si el lote tiene movimientos posteriores.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
+            {isDeleting ? "Eliminando..." : "Eliminar"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

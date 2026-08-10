@@ -106,6 +106,7 @@ export const createProductionRun = mutation({
       );
     }
     const productionTimestamp = args.productionDate ?? Date.now();
+    validateProductionDate(productionTimestamp, "La fecha de entrada");
 
     for (const output of resolvedOutputs) {
       const product = await ctx.db.get(output.productId);
@@ -188,6 +189,7 @@ export const createProductionRun = mutation({
 
       const outputId = await ctx.db.insert("productionOutputs", {
         productionRunId: productionRunId,
+        outputDate: productionTimestamp,
         productId: output.productId,
         quantityProduced: output.quantityProduced,
         resultingInventoryLotId: resultingInventoryLotId,
@@ -215,8 +217,10 @@ export const editProductionRunEntry = mutation({
     inputLotId: v.id("inventoryLots"),
     quantityConsumed: v.number(),
     notes: v.optional(v.string()),
+    runDate: v.number(),
   },
   handler: async (ctx, args) => {
+    validateProductionDate(args.runDate, "La fecha de entrada");
     if (args.quantityConsumed <= 0) {
       throw new Error("La cantidad consumida debe ser mayor que cero.");
     }
@@ -231,6 +235,40 @@ export const editProductionRunEntry = mutation({
       .withIndex("by_run", (q) => q.eq("productionRunId", run._id))
       .collect();
 
+    const outputLots = await Promise.all(
+      outputs.map((output) =>
+        output.resultingInventoryLotId
+          ? ctx.db.get(output.resultingInventoryLotId)
+          : null,
+      ),
+    );
+    const earliestOutputDate = outputs.reduce((earliest, output, index) => {
+      const date = output.outputDate ?? outputLots[index]?.creationDate ?? run.runDate;
+      return Math.min(earliest, date);
+    }, Number.POSITIVE_INFINITY);
+    if (args.runDate > earliestOutputDate) {
+      throw new Error(
+        "La fecha de entrada no puede ser posterior a la fecha de una salida.",
+      );
+    }
+
+    // Materialize the original date on legacy outputs before runDate changes.
+    for (let index = 0; index < outputs.length; index += 1) {
+      if (outputs[index].outputDate === undefined) {
+        await ctx.db.patch(outputs[index]._id, {
+          outputDate: outputLots[index]?.creationDate ?? run.runDate,
+        });
+      }
+    }
+
+    await patchRelatedActivityTimestamps(
+      ctx,
+      run.inputLotId,
+      run._id,
+      "production_out",
+      args.runDate,
+    );
+
     if (outputs.length > 0) {
       if (
         args.inputLotId !== run.inputLotId ||
@@ -243,6 +281,7 @@ export const editProductionRunEntry = mutation({
 
       await ctx.db.patch(run._id, {
         notes: args.notes,
+        runDate: args.runDate,
       });
       return;
     }
@@ -289,6 +328,7 @@ export const editProductionRunEntry = mutation({
       inputLotId: args.inputLotId,
       quantityConsumed: args.quantityConsumed,
       notes: args.notes,
+      runDate: args.runDate,
     });
 
     if (isSameLot) {
@@ -334,8 +374,10 @@ export const editProductionOutputEntry = mutation({
     quantityProduced: v.number(),
     lotNumber: v.string(),
     warehouseId: v.id("warehouse"),
+    outputDate: v.number(),
   },
   handler: async (ctx, args) => {
+    validateProductionDate(args.outputDate, "La fecha de salida");
     if (args.quantityConsumed <= 0 || args.quantityProduced <= 0) {
       throw new Error("Quantities must be greater than zero.");
     }
@@ -345,6 +387,11 @@ export const editProductionOutputEntry = mutation({
 
     const run = await ctx.db.get(args.productionRunId);
     if (!run) throw new Error("Production run not found.");
+    if (args.outputDate < run.runDate) {
+      throw new Error(
+        "La fecha de salida no puede ser anterior a la fecha de entrada.",
+      );
+    }
 
     const output = await ctx.db.get(args.productionOutputId);
     if (!output) throw new Error("Production output not found.");
@@ -438,11 +485,21 @@ export const editProductionOutputEntry = mutation({
       warehouseId: args.warehouseId,
       lotNumber: args.lotNumber,
       quantity: resultingOutputQuantity,
+      creationDate: args.outputDate,
     });
 
     await ctx.db.patch(output._id, {
       quantityProduced: args.quantityProduced,
+      outputDate: args.outputDate,
     });
+
+    await patchRelatedActivityTimestamps(
+      ctx,
+      outputLot._id,
+      run._id,
+      "production_in",
+      args.outputDate,
+    );
 
     const inputDelta = run.quantityConsumed - args.quantityConsumed;
     if (inputDelta !== 0) {
@@ -496,6 +553,13 @@ export const addOutputsToProductionRun = mutation({
     if (!run) {
       throw new Error("Production run not found.");
     }
+    const outputTimestamp = args.outputDate ?? Date.now();
+    validateProductionDate(outputTimestamp, "La fecha de salida");
+    if (outputTimestamp < run.runDate) {
+      throw new Error(
+        "La fecha de salida no puede ser anterior a la fecha de entrada.",
+      );
+    }
 
     const inputLot = await ctx.db.get(run.inputLotId);
     if (!inputLot) {
@@ -524,8 +588,6 @@ export const addOutputsToProductionRun = mutation({
         "La suma de las salidas no puede superar la cantidad consumida de la entrada.",
       );
     }
-    const outputTimestamp = args.outputDate ?? Date.now();
-
     for (const output of resolvedOutputs) {
       if (output.quantityProduced <= 0) {
         throw new Error("Produced quantity must be greater than zero.");
@@ -578,6 +640,7 @@ export const addOutputsToProductionRun = mutation({
 
       const outputId = await ctx.db.insert("productionOutputs", {
         productionRunId: run._id,
+        outputDate: outputTimestamp,
         productId: output.productId,
         quantityProduced: output.quantityProduced,
         resultingInventoryLotId,
@@ -592,6 +655,124 @@ export const addOutputsToProductionRun = mutation({
         });
       }
     }
+  },
+});
+
+export const deleteProductionOutput = mutation({
+  args: {
+    productionRunId: v.id("productionRuns"),
+    productionOutputId: v.id("productionOutputs"),
+  },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.productionRunId);
+    const output = await ctx.db.get(args.productionOutputId);
+    if (!run || !output || output.productionRunId !== run._id) {
+      throw new Error("Salida de producción no encontrada.");
+    }
+
+    const qualityValues = await ctx.db
+      .query("lotQuality")
+      .withIndex("by_production_output", (q) =>
+        q.eq("productionOutputId", output._id),
+      )
+      .collect();
+
+    if (output.resultingInventoryLotId) {
+      const lot = await ctx.db.get(output.resultingInventoryLotId);
+      if (!lot) {
+        throw new Error("El lote de salida asociado no fue encontrado.");
+      }
+      if (
+        lot.source.type !== "production" ||
+        lot.source.productionRunId !== run._id
+      ) {
+        throw new Error("El lote no pertenece a esta producción.");
+      }
+
+      const activity = await ctx.db
+        .query("activityLog")
+        .withIndex("by_lot", (q) => q.eq("inventoryLotId", lot._id))
+        .collect();
+      const hasLaterMovement = activity.some(
+        (entry) =>
+          entry.relatedId !== run._id ||
+          (entry.activityType !== "production_in" &&
+            entry.activityType !== "adjustment"),
+      );
+      const dispatchLine = await ctx.db
+        .query("dispatchLineItems")
+        .filter((q) => q.eq(q.field("inventoryLotId"), lot._id))
+        .first();
+      const downstreamRun = await ctx.db
+        .query("productionRuns")
+        .filter((q) => q.eq(q.field("inputLotId"), lot._id))
+        .first();
+
+      if (
+        hasLaterMovement ||
+        dispatchLine ||
+        downstreamRun ||
+        lot.quantity !== output.quantityProduced
+      ) {
+        throw new Error(
+          "No se puede eliminar esta salida porque tiene movimientos posteriores.",
+        );
+      }
+
+      for (const entry of activity) {
+        await ctx.db.delete(entry._id);
+      }
+      await ctx.db.delete(lot._id);
+    }
+
+    for (const qualityValue of qualityValues) {
+      await ctx.db.delete(qualityValue._id);
+    }
+    await ctx.db.delete(output._id);
+  },
+});
+
+export const deleteProductionRunEntry = mutation({
+  args: { productionRunId: v.id("productionRuns") },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.productionRunId);
+    if (!run) {
+      throw new Error("Entrada de producción no encontrada.");
+    }
+
+    const output = await ctx.db
+      .query("productionOutputs")
+      .withIndex("by_run", (q) => q.eq("productionRunId", run._id))
+      .first();
+    if (output) {
+      throw new Error(
+        "No se puede eliminar esta entrada porque tiene salidas de producción asociadas.",
+      );
+    }
+
+    const inputLot = await ctx.db.get(run.inputLotId);
+    if (!inputLot || inputLot.organizationId !== run.organizationId) {
+      throw new Error("El lote de entrada asociado no fue encontrado.");
+    }
+
+    const relatedActivity = await ctx.db
+      .query("activityLog")
+      .withIndex("by_org", (q) => q.eq("organizationId", run.organizationId))
+      .filter((q) => q.eq(q.field("relatedId"), run._id))
+      .collect();
+
+    await ctx.db.patch(inputLot._id, {
+      quantity: inputLot.quantity + run.quantityConsumed,
+    });
+    for (const entry of relatedActivity) {
+      if (
+        entry.activityType === "production_out" ||
+        entry.activityType === "adjustment"
+      ) {
+        await ctx.db.delete(entry._id);
+      }
+    }
+    await ctx.db.delete(run._id);
   },
 });
 
@@ -692,13 +873,13 @@ export const getProductionHistory = query({
 
             return {
               _id: output._id,
+              outputDate: output.outputDate ?? lot?.creationDate ?? run.runDate,
               productName: product?.name ?? "N/A",
               productId: output.productId,
               quantityProduced: output.quantityProduced,
               resultingInventoryLotId: output.resultingInventoryLotId,
               outputType: normalizeOutputType(output.outputType),
               warehouseId: lot?.warehouseId,
-              outputDate: lot?.creationDate ?? run.runDate,
               newLotNumber: lot?.lotNumber ?? "N/A (By-product)",
               unit: product?.baseUnit ?? "",
               qualityFactors: qualityFactorsWithNames,
@@ -742,6 +923,38 @@ async function getUsedWarehouseCapacity(
   }, 0);
 }
 
+function validateProductionDate(timestamp: number, label: string) {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    throw new Error(`${label} es inválida.`);
+  }
+  // UI stores a selected local calendar day at noon. The tolerance allows
+  // today's noon when the mutation is executed earlier in the morning.
+  if (timestamp > Date.now() + 24 * 60 * 60 * 1000) {
+    throw new Error(`${label} no puede estar en el futuro.`);
+  }
+}
+
+async function patchRelatedActivityTimestamps(
+  ctx: any,
+  inventoryLotId: Id<"inventoryLots">,
+  productionRunId: Id<"productionRuns">,
+  activityType: "production_in" | "production_out",
+  timestamp: number,
+) {
+  const activity = await ctx.db
+    .query("activityLog")
+    .withIndex("by_lot", (q: any) => q.eq("inventoryLotId", inventoryLotId))
+    .collect();
+  for (const entry of activity) {
+    if (
+      entry.relatedId === productionRunId &&
+      entry.activityType === activityType
+    ) {
+      await ctx.db.patch(entry._id, { timestamp });
+    }
+  }
+}
+
 export const getProductionVolume = query({
     args: {
         organizationId: v.id("organizations"),
@@ -756,7 +969,10 @@ export const getProductionVolume = query({
         for(const p of production) {
             const run = await ctx.db.get(p.productionRunId);
             if(run?.organizationId === args.organizationId) {
-                const date = new Date(run.runDate);
+                const outputLot = p.resultingInventoryLotId
+                    ? await ctx.db.get(p.resultingInventoryLotId)
+                    : null;
+                const date = new Date(p.outputDate ?? outputLot?.creationDate ?? run.runDate);
                 const key = `${date.getFullYear()}-${date.getMonth()}`;
                 const current = data.get(key) ?? 0;
                 data.set(key, current + p.quantityProduced);

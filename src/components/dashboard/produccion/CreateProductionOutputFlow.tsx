@@ -258,7 +258,13 @@ export default function CreateProductionOutputFlow() {
                           field.onChange(date ?? toLocalCalendarDate(new Date()))
                         }
                         placeholder="Seleccione una fecha"
-                        disabled={(date) => toLocalCalendarDate(date) > today}
+                        disabled={(date) => {
+                          const day = toLocalCalendarDate(date);
+                          return (
+                            day > today ||
+                            day < toLocalCalendarDate(new Date(selectedRun.runDate))
+                          );
+                        }}
                       />
                     </FormControl>
                   </FormItem>
