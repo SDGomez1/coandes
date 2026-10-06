@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useMemo, useState } from "react";
+import type { DateRange } from "react-day-picker";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { convertFromCanonical, WeightUnit } from "@/lib/units";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PaginationControls } from "./PaginationControls";
 import { ExportActions } from "../exportaciones/ExportActions";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { isDateInRange } from "@/lib/date";
 
 type WarehouseInventoryRow = {
   _id: Id<"inventoryLots">;
@@ -37,6 +40,7 @@ type WarehouseInventoryRow = {
   productType: string;
   supplierName: string;
   quantity: number;
+  creationDate: number;
   presentation?: string;
   equivalence?: string;
   averageWeight?: number;
@@ -114,6 +118,15 @@ export default function WarehouseInventoryTable({
   );
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+
+  const filteredItems = useMemo(
+    () =>
+      (data?.items ?? []).filter((row) =>
+        isDateInRange(row.creationDate, dateRange?.from, dateRange?.to),
+      ),
+    [data, dateRange],
+  );
 
   const columns = useMemo(
     () => [
@@ -275,10 +288,10 @@ export default function WarehouseInventoryTable({
     [selectedWarehouse?.baseUnit],
   );
 
-  const exportRows = data?.items ?? [];
+  const exportRows = filteredItems;
 
   const table = useReactTable({
-    data: data?.items ?? [],
+    data: filteredItems,
     columns,
     state: {
       sorting,
@@ -344,19 +357,30 @@ export default function WarehouseInventoryTable({
 
   return (
     <div className="mt-8 flow-root">
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <Input
           placeholder="Buscar por producto, proveedor o tiquete..."
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
         />
-        <ExportActions
-          organizationId={organizationId}
-          moduleName="inventario_bodega"
-          fileBaseName="inventario-bodega"
-          rows={exportRows}
-          columns={[
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDateRange(undefined)}
+            disabled={!dateRange?.from}
+            className="whitespace-nowrap"
+          >
+            Limpiar fechas
+          </Button>
+          <ExportActions
+            organizationId={organizationId}
+            moduleName="inventario_bodega"
+            fileBaseName="inventario-bodega"
+            rows={exportRows}
+            columns={[
             { header: "No. Tiquete", value: (row) => row.lotNumber },
             { header: "Producto", value: (row) => row.productName },
             {
@@ -391,8 +415,9 @@ export default function WarehouseInventoryTable({
                 return label ? `${formatNumber(qty)} ${label}` : "No aplica";
               },
             },
-          ]}
-        />
+            ]}
+          />
+        </div>
       </div>
       <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">
         <Table>

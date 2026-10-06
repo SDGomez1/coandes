@@ -81,6 +81,7 @@ export const getWarehouseInventory = query({
           productType: product?.type ?? "Tipo desconocido",
           supplierName: supplierName,
           quantity: lot.quantity,
+          creationDate: lot.creationDate,
           presentation: product?.presentation ?? "",
           equivalence: product?.equivalence ?? "",
           averageWeight: product?.averageWeight ?? 0,
@@ -285,6 +286,21 @@ export const getMovementHistory = query({
         const product = lot ? await ctx.db.get(lot.productId) : null;
         const warehouse = lot ? await ctx.db.get(lot.warehouseId) : null;
 
+        // Las notas se generan al editar entradas de producción y se guardan en
+        // el "productionRun" relacionado. Solo los movimientos cuyo relatedId
+        // apunta a un productionRun tienen nota asociada.
+        let notes = "";
+        if (entry.relatedId) {
+          const productionRunId = ctx.db.normalizeId(
+            "productionRuns",
+            entry.relatedId,
+          );
+          if (productionRunId) {
+            const run = await ctx.db.get(productionRunId);
+            notes = run?.notes ?? "";
+          }
+        }
+
         return {
           _id: entry._id,
           activityType: entry.activityType,
@@ -296,6 +312,7 @@ export const getMovementHistory = query({
           productName: product?.name ?? "Producto no encontrado",
           warehouseName: warehouse?.name ?? "Bodega no encontrada",
           unit: product?.baseUnit ?? "kg",
+          notes,
         };
       }),
     );

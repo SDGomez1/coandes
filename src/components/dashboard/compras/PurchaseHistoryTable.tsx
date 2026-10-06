@@ -19,6 +19,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
+import type { DateRange } from "react-day-picker";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { convertFromCanonical, convertToCanonical } from "@/lib/units";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,8 @@ import {
 } from "@/components/ui/select";
 import { ExportActions } from "../exportaciones/ExportActions";
 import { DatePicker } from "@/components/ui/date-picker";
-import { toLocalCalendarDate, toLocalDayTimestamp } from "@/lib/date";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { isDateInRange, toLocalCalendarDate, toLocalDayTimestamp } from "@/lib/date";
 
 type PurchaseHistoryRow = {
   _id: Id<"inventoryLots">;
@@ -130,6 +132,15 @@ export default function PurchaseHistoryTable() {
 
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+
+  const filteredData = useMemo(
+    () =>
+      (data ?? []).filter((row) =>
+        isDateInRange(row.creationDate, dateRange?.from, dateRange?.to),
+      ),
+    [data, dateRange],
+  );
 
   const columns = useMemo(
     () => [
@@ -292,7 +303,7 @@ export default function PurchaseHistoryTable() {
   );
 
   const table = useReactTable({
-    data: data ?? [],
+    data: filteredData,
     columns,
     state: {
       sorting,
@@ -358,19 +369,30 @@ export default function PurchaseHistoryTable() {
 
   return (
     <div className="mt-8 flow-root">
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <Input
           placeholder="Buscar por item, proveedor o tiquete..."
           value={globalFilter ?? ""}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
         />
-        <ExportActions
-          organizationId={orgId}
-          moduleName="historial_compras"
-          fileBaseName="historial-compras"
-          rows={data}
-          columns={[
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDateRange(undefined)}
+            disabled={!dateRange?.from}
+            className="whitespace-nowrap"
+          >
+            Limpiar fechas
+          </Button>
+          <ExportActions
+            organizationId={orgId}
+            moduleName="historial_compras"
+            fileBaseName="historial-compras"
+            rows={filteredData}
+            columns={[
             { header: "No. Tiquete", value: (row) => row.lotNumber },
             { header: "Producto", value: (row) => row.productName },
             { header: "Proveedor", value: (row) => row.supplierName },
@@ -393,8 +415,9 @@ export default function PurchaseHistoryTable() {
                 return label ? `${formatNumber(eq)} ${label}` : "N/A";
               },
             },
-          ]}
-        />
+            ]}
+          />
+        </div>
       </div>
       <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">
         <Table>

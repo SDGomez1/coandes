@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { DateRange } from "react-day-picker";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
@@ -30,6 +31,8 @@ import { PaginationControls } from "../bodega/PaginationControls";
 import { convertFromCanonical } from "@/lib/units";
 import { cn, formatNumber } from "@/lib/utils";
 import { ExportActions } from "../exportaciones/ExportActions";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { isDateInRange } from "@/lib/date";
 
 type MovementHistoryRow = {
   _id: Id<"activityLog">;
@@ -47,6 +50,7 @@ type MovementHistoryRow = {
   productName: string;
   warehouseName: string;
   unit: string;
+  notes?: string;
 };
 
 const columnHelper = createColumnHelper<MovementHistoryRow>();
@@ -81,6 +85,15 @@ export default function MovementHistoryTable() {
   const [sorting, setSorting] = useState<SortingState>([
     { id: "timestamp", desc: true },
   ]);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+
+  const filteredData = useMemo(
+    () =>
+      (data ?? []).filter((row) =>
+        isDateInRange(row.timestamp, dateRange?.from, dateRange?.to),
+      ),
+    [data, dateRange],
+  );
 
   const columns = useMemo(
     () => [
@@ -203,12 +216,35 @@ export default function MovementHistoryTable() {
           );
         },
       }),
+      columnHelper.accessor("notes", {
+        id: "notes",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Nota
+            {column.getIsSorted() === "asc" ? (
+              <ArrowUp className="ml-2 h-4 w-4" />
+            ) : (
+              <ArrowDown className="ml-2 h-4 w-4" />
+            )}
+          </Button>
+        ),
+        cell: (info) => {
+          const note = info.getValue();
+          if (!note) {
+            return <span className="text-gray-400">—</span>;
+          }
+          return <span className="whitespace-pre-wrap break-words">{note}</span>;
+        },
+      }),
     ],
     [],
   );
 
   const table = useReactTable({
-    data: data ?? [],
+    data: filteredData,
     columns,
     state: {
       sorting,
@@ -263,34 +299,47 @@ export default function MovementHistoryTable() {
 
   return (
     <div className="mt-8 flow-root">
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <Input
           placeholder="Buscar por etapa, producto, tiquete o referencia..."
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
         />
-        <ExportActions
-          organizationId={orgId}
-          moduleName="historial_movimientos"
-          fileBaseName="historial-movimientos"
-          rows={data}
-          columns={[
-            { header: "Fecha", value: (row) => new Date(row.timestamp).toLocaleString() },
-            { header: "Etapa", value: (row) => getActivityLabel(row.activityType) },
-            { header: "Producto", value: (row) => row.productName },
-            { header: "Bodega", value: (row) => row.warehouseName },
-            { header: "No. Tiquete", value: (row) => row.lotNumber },
-            {
-              header: "Movimiento (kg)",
-              value: (row) => {
-                const movementKg = convertFromCanonical(row.quantityChange, "kg");
-                const prefix = movementKg > 0 ? "+" : "";
-                return `${prefix}${formatNumber(movementKg)}`;
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDateRange(undefined)}
+            disabled={!dateRange?.from}
+            className="whitespace-nowrap"
+          >
+            Limpiar fechas
+          </Button>
+          <ExportActions
+            organizationId={orgId}
+            moduleName="historial_movimientos"
+            fileBaseName="historial-movimientos"
+            rows={filteredData}
+            columns={[
+              { header: "Fecha", value: (row) => new Date(row.timestamp).toLocaleString() },
+              { header: "Etapa", value: (row) => getActivityLabel(row.activityType) },
+              { header: "Producto", value: (row) => row.productName },
+              { header: "Bodega", value: (row) => row.warehouseName },
+              { header: "No. Tiquete", value: (row) => row.lotNumber },
+              {
+                header: "Movimiento (kg)",
+                value: (row) => {
+                  const movementKg = convertFromCanonical(row.quantityChange, "kg");
+                  const prefix = movementKg > 0 ? "+" : "";
+                  return `${prefix}${formatNumber(movementKg)}`;
+                },
               },
-            },
-          ]}
-        />
+              { header: "Nota", value: (row) => row.notes ?? "" },
+            ]}
+          />
+        </div>
       </div>
       <div className="overflow-hidden shadow ring-1 ring-[#ebebeb] ring-opacity-5 sm:rounded-lg">
         <Table>

@@ -23,6 +23,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useEffect, useMemo, useState } from "react";
+import type { DateRange } from "react-day-picker";
 import { LoadingSpinner } from "@/assets/icons/LoadingSpinner";
 import { convertFromCanonical, convertToCanonical, WeightUnit } from "@/lib/units";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,8 @@ import {
 } from "@/components/ui/select";
 import { ExportActions } from "../exportaciones/ExportActions";
 import { DatePicker } from "@/components/ui/date-picker";
-import { toLocalCalendarDate, toLocalDayTimestamp } from "@/lib/date";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { isDateInRange, toLocalCalendarDate, toLocalDayTimestamp } from "@/lib/date";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -194,6 +196,23 @@ export default function ProductionHistoryTable() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [entrySorting, setEntrySorting] = useState<SortingState>([]);
   const [outputSorting, setOutputSorting] = useState<SortingState>([]);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+
+  const filteredEntryData = useMemo(
+    () =>
+      entryData.filter((row) =>
+        isDateInRange(row.runDate, dateRange?.from, dateRange?.to),
+      ),
+    [entryData, dateRange],
+  );
+
+  const filteredOutputData = useMemo(
+    () =>
+      outputData.filter((row) =>
+        isDateInRange(row.outputDate, dateRange?.from, dateRange?.to),
+      ),
+    [outputData, dateRange],
+  );
 
   const outputColumns = useMemo(
     () => [
@@ -477,7 +496,7 @@ export default function ProductionHistoryTable() {
   );
 
   const entryTable = useReactTable({
-    data: entryData,
+    data: filteredEntryData,
     columns: entryColumns,
     state: {
       sorting: entrySorting,
@@ -492,7 +511,7 @@ export default function ProductionHistoryTable() {
   });
 
   const outputTable = useReactTable({
-    data: outputData,
+    data: filteredOutputData,
     columns: outputColumns,
     state: {
       sorting: outputSorting,
@@ -612,7 +631,7 @@ export default function ProductionHistoryTable() {
         </Button>
       </div>
 
-      <div className="flex items-center justify-between mb-4">
+      <div className="mb-4 flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <Input
           placeholder={
             viewMode === "entries"
@@ -623,23 +642,35 @@ export default function ProductionHistoryTable() {
           onChange={(e) => setGlobalFilter(e.target.value)}
           className="max-w-lg"
         />
-        {viewMode === "entries" ? (
-          <ExportActions
-            organizationId={orgId}
-            moduleName="historial_produccion_entradas"
-            fileBaseName="historial-produccion-entradas"
-            rows={entryData}
-            columns={entryExportColumns}
-          />
-        ) : (
-          <ExportActions
-            organizationId={orgId}
-            moduleName="historial_produccion_salidas"
-            fileBaseName="historial-produccion-salidas"
-            rows={outputData}
-            columns={outputExportColumns}
-          />
-        )}
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDateRange(undefined)}
+            disabled={!dateRange?.from}
+            className="whitespace-nowrap"
+          >
+            Limpiar fechas
+          </Button>
+          {viewMode === "entries" ? (
+            <ExportActions
+              organizationId={orgId}
+              moduleName="historial_produccion_entradas"
+              fileBaseName="historial-produccion-entradas"
+              rows={filteredEntryData}
+              columns={entryExportColumns}
+            />
+          ) : (
+            <ExportActions
+              organizationId={orgId}
+              moduleName="historial_produccion_salidas"
+              fileBaseName="historial-produccion-salidas"
+              rows={filteredOutputData}
+              columns={outputExportColumns}
+            />
+          )}
+        </div>
       </div>
       {viewMode === "entries" ? (
         <ProductionHistoryDataTable table={entryTable} />
@@ -803,6 +834,11 @@ function EditProductionRunEntryDialog({
   };
 
   const handleSave = async () => {
+    if (!notes.trim()) {
+      toast.error("La nota es obligatoria para guardar los cambios.");
+      return;
+    }
+
     if (!sourceFieldsLocked && (!selectedProductId || !selectedLotId)) {
       toast.error("Debe seleccionar un producto y un lote de entrada.");
       return;
@@ -835,7 +871,7 @@ function EditProductionRunEntryDialog({
         productionRunId: entry.runId,
         inputLotId: (sourceFieldsLocked ? entry.inputLotId : selectedLotId) as Id<"inventoryLots">,
         quantityConsumed: convertToCanonical(parsedConsumed, "kg"),
-        notes: notes.trim() ? notes.trim() : undefined,
+        notes: notes.trim(),
         runDate: toLocalDayTimestamp(runDate),
       });
       toast.success("Entrada de producción actualizada correctamente.");
@@ -935,8 +971,15 @@ function EditProductionRunEntryDialog({
             />
           </div>
           <div>
-            <p className="text-sm mb-2">Notas</p>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <p className="text-sm mb-2">
+              Notas <span className="text-red-500">*</span>
+            </p>
+            <Input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Obligatorio"
+              aria-required="true"
+            />
           </div>
           <div>
             <p className="text-sm mb-2">Fecha de entrada</p>
