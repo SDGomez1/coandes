@@ -17,7 +17,7 @@ export const ClientAuthBoundary = ({ children }: PropsWithChildren) => {
   return (
     <AuthBoundary
       authClient={authClient}
-      onUnauth={() => router.push("/sign-in")}
+      onUnauth={() => router.push("/auth/login")}
       getAuthUserFn={api.auth.getAuthUser}
       isAuthError={isAuthError}
     >
